@@ -15,6 +15,7 @@ builder.Services.Configure<RutasSettings>(
     builder.Configuration.GetSection("Rutas"));
 
 builder.Services.AddSingleton<FileManagerService>();
+builder.Services.AddSingleton<FileWatcherService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();
