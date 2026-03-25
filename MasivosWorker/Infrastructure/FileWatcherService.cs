@@ -10,20 +10,30 @@ public class FileWatcherService
     private readonly RutasSettings _rutas;
     private readonly ILogger<FileWatcherService> _logger;
     private FileSystemWatcher _watcher;
-    private readonly BarcodeService _barcodeService;
     private readonly BarcodeRegionService _barcodeRegionService;
 
+    private readonly string _directorioEntrada;
+    private readonly string _directorioProcesados;
+    private readonly string _directorioError;
 
     public FileWatcherService(
-    IOptions<RutasSettings> rutasOptions,
-    ILogger<FileWatcherService> logger,
-    BarcodeRegionService baco,
-    BarcodeService barcodeService)
+        IOptions<RutasSettings> rutasOptions,
+        ILogger<FileWatcherService> logger,
+        BarcodeRegionService baco)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
-        _barcodeService = barcodeService;
         _barcodeRegionService = baco;
+
+        // 🔥 rutas desde configuración
+        _directorioEntrada = _rutas.Procesar;
+        _directorioProcesados = _rutas.Procesados;
+        _directorioError = _rutas.Error;
+
+        // 🔥 asegurar que existan
+        Directory.CreateDirectory(_directorioEntrada);
+        Directory.CreateDirectory(_directorioProcesados);
+        Directory.CreateDirectory(_directorioError);
     }
 
     public void Iniciar()
@@ -42,38 +52,41 @@ public class FileWatcherService
 
     private void OnCreated(object sender, FileSystemEventArgs e)
     {
-
-        lbEscaneaDocs.Clases.LeeCodigoBarrasIronBar leer;
-           
         try
         {
             _logger.LogInformation($"Procesando archivo: {e.FullPath}");
 
-            // Esperar a que termine de copiarse
             Thread.Sleep(2000);
-            
-           // leer = new lbEscaneaDocs.Clases.LeeCodigoBarrasIronBar(e.FullPath);
 
-           // var lecod = leer.ReaderBarCode();
+            var documento = _barcodeRegionService.ProcesarPdf(e.FullPath);
 
-            //var codigo = _barcodeService.ObtenerCodigo(e.FullPath);
-
-            var codigo = _barcodeRegionService.LeerCodigoDesdePdf(e.FullPath);
-
-           
-            
-           if (!string.IsNullOrEmpty(codigo))
+            if (documento != null)
             {
-                _logger.LogInformation($"Código final: {codigo}");
+                var destino = Path.Combine(_directorioProcesados, documento.NombreArchivo);
+
+                File.Move(e.FullPath, destino, true);
+
+                _logger.LogInformation($"Procesado OK → {documento.NombreArchivo}");
             }
             else
             {
-                _logger.LogWarning("Archivo sin código válido");
+                var destino = Path.Combine(_directorioError, Path.GetFileName(e.FullPath));
+
+                File.Move(e.FullPath, destino, true);
+
+                _logger.LogWarning("Movido a ERROR (no se pudo leer)");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error procesando archivo");
+
+            try
+            {
+                var destino = Path.Combine(_directorioError, Path.GetFileName(e.FullPath));
+                File.Move(e.FullPath, destino, true);
+            }
+            catch { }
         }
     }
 }

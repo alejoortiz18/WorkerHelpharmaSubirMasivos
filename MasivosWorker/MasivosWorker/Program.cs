@@ -18,7 +18,6 @@ builder.Services.Configure<RutasSettings>(
 builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<FileManagerService>();
 builder.Services.AddSingleton<FileWatcherService>();
-builder.Services.AddSingleton<BarcodeService>();
 builder.Services.AddSingleton<BarcodeRegionService>();
 
 // Worker
