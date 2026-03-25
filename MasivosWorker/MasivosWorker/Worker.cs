@@ -21,9 +21,9 @@ namespace MasivosWorker
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _logger.LogInformation("Worker iniciado");
-            // 👇 Crear carpetas al iniciar
+         
             _fileManager.CrearCarpetasSiNoExisten();
-            // Crear accesos directos
+            
             _fileManager.CrearAccesosDirectos();
 
             _watcher.Iniciar();

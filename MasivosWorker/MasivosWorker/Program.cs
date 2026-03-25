@@ -4,6 +4,7 @@ using IronBarCode;
 using Microsoft.Extensions.Options;
 using Models.Dto;
 using Infrastructure;
+using Services;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -14,13 +15,17 @@ builder.Services.Configure<IronBarcodeSettings>(
 builder.Services.Configure<RutasSettings>(
     builder.Configuration.GetSection("Rutas"));
 
+builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<FileManagerService>();
 builder.Services.AddSingleton<FileWatcherService>();
+builder.Services.AddSingleton<BarcodeService>();
+builder.Services.AddSingleton<BarcodeRegionService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
+host.Services.GetRequiredService<IronBarcodeLicenseInitializer>();
 
 // Aplicar licencia
 var ironSettings = host.Services.GetRequiredService<IOptions<IronBarcodeSettings>>().Value;

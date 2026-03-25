@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Models.Dto;
+using Services;
 
 namespace Infrastructure;
 
@@ -9,13 +10,20 @@ public class FileWatcherService
     private readonly RutasSettings _rutas;
     private readonly ILogger<FileWatcherService> _logger;
     private FileSystemWatcher _watcher;
+    private readonly BarcodeService _barcodeService;
+    private readonly BarcodeRegionService _barcodeRegionService;
+
 
     public FileWatcherService(
-        IOptions<RutasSettings> rutasOptions,
-        ILogger<FileWatcherService> logger)
+    IOptions<RutasSettings> rutasOptions,
+    ILogger<FileWatcherService> logger,
+    BarcodeRegionService baco,
+    BarcodeService barcodeService)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
+        _barcodeService = barcodeService;
+        _barcodeRegionService = baco;
     }
 
     public void Iniciar()
@@ -34,15 +42,38 @@ public class FileWatcherService
 
     private void OnCreated(object sender, FileSystemEventArgs e)
     {
+
+        lbEscaneaDocs.Clases.LeeCodigoBarrasIronBar leer;
+           
         try
         {
-            _logger.LogInformation($"Nuevo archivo detectado: {e.FullPath}");
+            _logger.LogInformation($"Procesando archivo: {e.FullPath}");
 
-            // Aquí luego vamos a procesar el PDF
+            // Esperar a que termine de copiarse
+            Thread.Sleep(2000);
+            
+           // leer = new lbEscaneaDocs.Clases.LeeCodigoBarrasIronBar(e.FullPath);
+
+           // var lecod = leer.ReaderBarCode();
+
+            //var codigo = _barcodeService.ObtenerCodigo(e.FullPath);
+
+            var codigo = _barcodeRegionService.LeerCodigoDesdePdf(e.FullPath);
+
+           
+            
+           if (!string.IsNullOrEmpty(codigo))
+            {
+                _logger.LogInformation($"Código final: {codigo}");
+            }
+            else
+            {
+                _logger.LogWarning("Archivo sin código válido");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al detectar archivo");
+            _logger.LogError(ex, "Error procesando archivo");
         }
     }
 }
