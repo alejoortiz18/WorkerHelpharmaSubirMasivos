@@ -5,10 +5,10 @@ using Services;
 
 namespace Infrastructure;
 
-public class FileWatcherService
+public class FileWatcherInfraestructure
 {
     private readonly RutasSettings _rutas;
-    private readonly ILogger<FileWatcherService> _logger;
+    private readonly ILogger<FileWatcherInfraestructure> _logger;
     private FileSystemWatcher _watcher;
     private readonly BarcodeRegionService _barcodeRegionService;
 
@@ -16,9 +16,9 @@ public class FileWatcherService
     private readonly string _directorioProcesados;
     private readonly string _directorioError;
 
-    public FileWatcherService(
+    public FileWatcherInfraestructure(
         IOptions<RutasSettings> rutasOptions,
-        ILogger<FileWatcherService> logger,
+        ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco)
     {
         _rutas = rutasOptions.Value;

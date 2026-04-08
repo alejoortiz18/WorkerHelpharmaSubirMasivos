@@ -6,14 +6,14 @@ using File = System.IO.File;
 
 namespace Infrastructure
 {
-    public class FileManagerService
+    public class FileManagerInfraestructure
     {
         private readonly RutasSettings _rutas;
-        private readonly ILogger<FileManagerService> _logger;
+        private readonly ILogger<FileManagerInfraestructure> _logger;
 
-        public FileManagerService(
+        public FileManagerInfraestructure(
             IOptions<RutasSettings> rutasOptions,
-            ILogger<FileManagerService> logger)
+            ILogger<FileManagerInfraestructure> logger)
         {
             _rutas = rutasOptions.Value;
             _logger = logger;

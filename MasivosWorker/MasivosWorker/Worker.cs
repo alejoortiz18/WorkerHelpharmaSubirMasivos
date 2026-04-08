@@ -7,13 +7,13 @@ namespace MasivosWorker
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
-        private readonly FileManagerService _fileManager;
-        private readonly FileWatcherService _watcher;
+        private readonly FileManagerInfraestructure _fileManager;
+        private readonly FileWatcherInfraestructure _watcher;
 
         public Worker(
             ILogger<Worker> logger,
-            FileManagerService fileManager,
-            FileWatcherService watcher)
+            FileManagerInfraestructure fileManager,
+            FileWatcherInfraestructure watcher)
         {
             _logger = logger;
             _fileManager = fileManager;
