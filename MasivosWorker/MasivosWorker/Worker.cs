@@ -28,7 +28,7 @@ namespace MasivosWorker
                 _fileManager.CrearCarpetasSiNoExisten();
                 _fileManager.CrearAccesosDirectos();
 
-                
+                _watcher.ProcesarPendientesAlIniciar();
                 _watcher.Iniciar();
 
                 _logger.LogInformation("Sistema listo y escuchando archivos...");

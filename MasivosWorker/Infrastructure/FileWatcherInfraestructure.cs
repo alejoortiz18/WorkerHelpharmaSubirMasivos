@@ -18,11 +18,18 @@ public class FileWatcherInfraestructure
     private readonly HashSet<string> _procesando = new();
     private readonly SemaphoreSlim _semaforo = new(2);
 
+    // 🔥 CONTADORES
+    private int _procesadosOk = 0;
+    private int _procesadosError = 0;
+    private int _procesadosTotal = 0;
+
+    private readonly object _lockStats = new();
+
     public FileWatcherInfraestructure(
         IOptions<RutasSettings> rutasOptions,
         ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco,
-        FileManagerInfraestructure fileManager) // 🔥 INYECCIÓN
+        FileManagerInfraestructure fileManager)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
@@ -51,9 +58,39 @@ public class FileWatcherInfraestructure
         _logger.LogInformation("Watcher iniciado en carpeta Procesar");
     }
 
+    public void ProcesarPendientesAlIniciar()
+    {
+        try
+        {
+            var archivos = Directory.GetFiles(_rutas.Procesando, "*.pdf");
+
+            if (archivos.Length == 0)
+            {
+                _logger.LogInformation("No hay archivos pendientes en PROCESANDO");
+                return;
+            }
+
+            _logger.LogWarning(
+                "RecuperacionArchivos | Cantidad={Cantidad}",
+                archivos.Length
+            );
+
+            foreach (var archivo in archivos)
+            {
+                Task.Run(() => ProcesarArchivoAsync(archivo));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error recuperando archivos pendientes");
+        }
+    }
+
     private async Task ProcesarArchivoAsync(string ruta)
     {
         await _semaforo.WaitAsync();
+
+        var nombreArchivo = Path.GetFileName(ruta);
 
         if (!MarcarComoProcesando(ruta))
         {
@@ -65,51 +102,61 @@ public class FileWatcherInfraestructure
 
         try
         {
-            _logger.LogInformation($"Archivo detectado: {ruta}");
-
-            // 🔥 1. Esperar a que termine de copiarse
-            await EsperarArchivoDisponible(ruta);
-
-            // 🔥 2. MOVER A PROCESANDO (CLAVE)
-            rutaProcesando = _fileManager.MoverAProcesando(ruta);
-
-            _logger.LogInformation($"Procesando desde: {rutaProcesando}");
-
-            // 🔥 3. PROCESAR
-            var documento = await Task.Run(() =>
-                _barcodeRegionService.ProcesarPdf(rutaProcesando)
+            _logger.LogInformation(
+                "ArchivoDetectado | Archivo={Archivo} | Ruta={Ruta}",
+                nombreArchivo,
+                ruta
             );
 
-            // 🔥 4. RESULTADO
+            await EsperarArchivoDisponible(ruta);
+
+            rutaProcesando = _fileManager.MoverAProcesando(ruta);
+
+            //var documento = await Task.Run(() =>
+            //    _barcodeRegionService.ProcesarPdf(rutaProcesando)
+            //);
+
+            var documento = await ProcesarConReintentos(rutaProcesando, nombreArchivo);
+
             if (documento != null)
             {
                 _fileManager.MoverAProcesados(rutaProcesando, documento.NombreArchivo);
 
-                _logger.LogInformation($"Procesado OK → {documento.NombreArchivo}");
+                ActualizarContadores(ok: true);
             }
             else
             {
                 _fileManager.MoverAError(rutaProcesando);
 
-                _logger.LogWarning("No se pudo leer → enviado a ERROR");
+                _logger.LogWarning(
+                    "ArchivoSinCodigo | Archivo={Archivo} | Ruta={Ruta}",
+                    nombreArchivo,
+                    rutaProcesando
+                );
+
+                ActualizarContadores(ok: false);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error procesando archivo: {ruta}");
+            _logger.LogError(
+                ex,
+                "ErrorProcesandoArchivo | Archivo={Archivo} | Ruta={Ruta} | Mensaje={Mensaje}",
+                nombreArchivo,
+                rutaProcesando ?? ruta,
+                ex.Message
+            );
 
             try
             {
                 if (!string.IsNullOrEmpty(rutaProcesando) && File.Exists(rutaProcesando))
-                {
                     _fileManager.MoverAError(rutaProcesando);
-                }
                 else if (File.Exists(ruta))
-                {
                     _fileManager.MoverAError(ruta);
-                }
             }
             catch { }
+
+            ActualizarContadores(ok: false);
         }
         finally
         {
@@ -119,6 +166,30 @@ public class FileWatcherInfraestructure
             }
 
             _semaforo.Release();
+        }
+    }
+
+    private void ActualizarContadores(bool ok)
+    {
+        lock (_lockStats)
+        {
+            _procesadosTotal++;
+
+            if (ok)
+                _procesadosOk++;
+            else
+                _procesadosError++;
+
+            // 🔥 LOG RESUMEN CADA 10 ARCHIVOS
+            if (_procesadosTotal % 10 == 0)
+            {
+                _logger.LogInformation(
+                    "ResumenProcesamiento | Total={Total} | OK={OK} | Error={Error}",
+                    _procesadosTotal,
+                    _procesadosOk,
+                    _procesadosError
+                );
+            }
         }
     }
 
@@ -154,5 +225,54 @@ public class FileWatcherInfraestructure
             _procesando.Add(ruta);
             return true;
         }
+    }
+
+    private async Task<DocumentoProcesadoDto?> ProcesarConReintentos(string ruta, string nombreArchivo)
+    {
+        int maxIntentos = 3;
+
+        for (int intento = 1; intento <= maxIntentos; intento++)
+        {
+            try
+            {
+                var resultado = await Task.Run(() =>
+                    _barcodeRegionService.ProcesarPdf(ruta)
+                );
+
+                if (resultado != null)
+                {
+                    if (intento > 1)
+                    {
+                        _logger.LogInformation(
+                            "ReintentoExitoso | Archivo={Archivo} | Intento={Intento}",
+                            nombreArchivo,
+                            intento
+                        );
+                    }
+
+                    return resultado;
+                }
+
+                _logger.LogWarning(
+                    "IntentoFallido | Archivo={Archivo} | Intento={Intento}",
+                    nombreArchivo,
+                    intento
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "ErrorEnIntento | Archivo={Archivo} | Intento={Intento}",
+                    nombreArchivo,
+                    intento
+                );
+            }
+
+            // 🔥 pequeña espera entre intentos
+            await Task.Delay(500);
+        }
+
+        return null;
     }
 }
