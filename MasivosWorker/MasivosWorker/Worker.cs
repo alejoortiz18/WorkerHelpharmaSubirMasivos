@@ -1,6 +1,4 @@
 using Infrastructure;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace MasivosWorker
 {
@@ -26,11 +24,11 @@ namespace MasivosWorker
 
             try
             {
-                // 🔥 Paso 1: Crear estructura
+               
                 _fileManager.CrearCarpetasSiNoExisten();
                 _fileManager.CrearAccesosDirectos();
 
-                // 🔥 Paso 2: Iniciar watcher
+                
                 _watcher.Iniciar();
 
                 _logger.LogInformation("Sistema listo y escuchando archivos...");
@@ -38,7 +36,7 @@ namespace MasivosWorker
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error inicializando el Worker");
-                throw; // 🔥 importante: no ocultar errores críticos
+                throw; 
             }
 
             try
@@ -50,7 +48,7 @@ namespace MasivosWorker
             }
             catch (TaskCanceledException)
             {
-                // 🔥 Esto es normal cuando se detiene el servicio
+                
             }
 
             _logger.LogInformation("Worker detenido");

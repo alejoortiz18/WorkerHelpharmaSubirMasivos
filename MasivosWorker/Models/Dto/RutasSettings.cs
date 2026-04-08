@@ -9,5 +9,6 @@ namespace Models.Dto
         public string Procesar { get; set; }
         public string Error { get; set; }
         public string Procesados { get; set; }
+        public string Procesando { get; set; } // 🔥 NUEVO
     }
 }

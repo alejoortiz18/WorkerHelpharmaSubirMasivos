@@ -3,6 +3,7 @@ using IronPdf;
 using Microsoft.Extensions.Logging;
 using Models.Dto;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.Text.RegularExpressions;
 
 namespace Services;
@@ -34,10 +35,8 @@ public class BarcodeRegionService
                 return null;
             }
 
-            // 🔥 Limpieza
             codigo = codigo.Replace(" ", "").Replace("-", "");
 
-            // 🔥 Separar prefijo y número
             var match = Regex.Match(codigo, @"^([A-Z]+)(\d+)$");
 
             if (!match.Success)
@@ -46,17 +45,11 @@ public class BarcodeRegionService
                 return null;
             }
 
-            var prefijo = match.Groups[1].Value;
-            var numero = match.Groups[2].Value;
-
-            var archivoBytes = File.ReadAllBytes(rutaPdf);
-
             return new DocumentoProcesadoDto
             {
-                Prefijo = prefijo,
-                Numero = numero,
-                NombreArchivo = $"{prefijo}{numero}.pdf",
-                Archivo = archivoBytes
+                Prefijo = match.Groups[1].Value,
+                Numero = match.Groups[2].Value,
+                NombreArchivo = $"{codigo}.pdf"
             };
         }
         catch (Exception ex)
@@ -72,72 +65,143 @@ public class BarcodeRegionService
         {
             using var pdf = PdfDocument.FromFile(rutaPdf);
 
-            var imagenes = pdf.ToBitmap(600);
+            using var bitmap = (Bitmap)pdf.ToBitmap(400).First(); // 🔥 subimos un poco DPI
 
             var opciones = new BarcodeReaderOptions
             {
-                Speed = ReadingSpeed.Detailed,
-                ExpectMultipleBarcodes = true,
-                Multithreaded = true,
-                MaxParallelThreads = 4,
+                Speed = ReadingSpeed.Balanced,
                 AutoRotate = true,
+                ExpectMultipleBarcodes = false,
+
                 MinScanLines = 1,
                 RemoveFalsePositive = false,
-                ConfidenceThreshold = 0.5
+                ConfidenceThreshold = 0.5,
+
+                Multithreaded = true,
+                MaxParallelThreads = Environment.ProcessorCount
             };
 
-            foreach (var img in imagenes)
+            // 🔥 REGIÓN SUPERIOR DERECHA
+            var regionRect = new Rectangle(
+                (int)(bitmap.Width * 0.55),
+                0,
+                (int)(bitmap.Width * 0.45),
+                (int)(bitmap.Height * 0.30) // 🔥 aumentamos altura
+            );
+
+            using (var region = bitmap.Clone(regionRect, bitmap.PixelFormat))
             {
-                using var bitmap = (Bitmap)img;
+                // 🔥 1. REGIÓN NORMAL
+                var resultado = BarcodeReader.Read(region, opciones);
 
-                // 🔥 INTENTO 1
-                var resultado = BarcodeReader.Read(bitmap, opciones);
-
-                if (resultado != null && resultado.Count > 0)
+                if (resultado?.Count > 0)
                 {
                     var codigo = resultado[0].Text;
-                    _logger.LogInformation($"Barcode detectado: {codigo}");
+                    _logger.LogInformation($"Barcode (región): {codigo}");
                     return codigo;
                 }
 
-                // 🔥 INTENTO 2: BLOQUES
-                int partes = 4;
-                int ancho = bitmap.Width / partes;
-                int alto = bitmap.Height / partes;
-
-                for (int i = 0; i < partes; i++)
+                // 🔥 2. REGIÓN MEJORADA (CLAVE PARA ESTE PDF)
+                using (var mejorada = MejorarImagen(region))
                 {
-                    for (int j = 0; j < partes; j++)
+                    var res2 = BarcodeReader.Read(mejorada, opciones);
+
+                    if (res2?.Count > 0)
                     {
-                        int x = i * ancho;
-                        int y = j * alto;
-
-                        int w = (i == partes - 1) ? bitmap.Width - x : ancho;
-                        int h = (j == partes - 1) ? bitmap.Height - y : alto;
-
-                        var rect = new Rectangle(x, y, w, h);
-
-                        using var sub = bitmap.Clone(rect, bitmap.PixelFormat);
-
-                        var res = BarcodeReader.Read(sub, opciones);
-
-                        if (res != null && res.Count > 0)
-                        {
-                            var codigo = res[0].Text;
-                            _logger.LogInformation($"Barcode detectado (bloque): {codigo}");
-                            return codigo;
-                        }
+                        var codigo = res2[0].Text;
+                        _logger.LogInformation($"Barcode (región mejorada): {codigo}");
+                        return codigo;
                     }
                 }
             }
 
-            _logger.LogWarning("No se detectó ningún código de barras");
+            // 🔥 3. IMAGEN COMPLETA
+            var resultadoCompleto = BarcodeReader.Read(bitmap, opciones);
+
+            if (resultadoCompleto?.Count > 0)
+            {
+                var codigo = resultadoCompleto[0].Text;
+                _logger.LogInformation($"Barcode completo: {codigo}");
+                return codigo;
+            }
+
+            // 🔥 4. IMAGEN COMPLETA MEJORADA
+            using (var mejorada = MejorarImagen(bitmap))
+            {
+                var res3 = BarcodeReader.Read(mejorada, opciones);
+
+                if (res3?.Count > 0)
+                {
+                    var codigo = res3[0].Text;
+                    _logger.LogInformation($"Barcode mejorado: {codigo}");
+                    return codigo;
+                }
+            }
+
+            // 🔥 5. BLOQUES (último recurso)
+            int partes = 2;
+
+            int ancho = bitmap.Width / partes;
+            int alto = bitmap.Height / partes;
+
+            for (int i = 0; i < partes; i++)
+            {
+                for (int j = 0; j < partes; j++)
+                {
+                    var rect = new Rectangle(i * ancho, j * alto, ancho, alto);
+
+                    using var sub = bitmap.Clone(rect, bitmap.PixelFormat);
+
+                    var res = BarcodeReader.Read(sub, opciones);
+
+                    if (res?.Count > 0)
+                    {
+                        var codigo = res[0].Text;
+                        _logger.LogInformation($"Barcode (bloque): {codigo}");
+                        return codigo;
+                    }
+                }
+            }
+
+            _logger.LogWarning("No se detectó ningún código");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error leyendo código de barras");
+            _logger.LogError(ex, "Error leyendo código");
         }
 
         return null;
+    }
+
+    private Bitmap MejorarImagen(Bitmap original)
+    {
+        var nueva = new Bitmap(original.Width, original.Height);
+
+        using (var g = Graphics.FromImage(nueva))
+        {
+            var matrix = new ColorMatrix(new float[][]
+            {
+                new float[] {1.4f, 0, 0, 0, 0},
+                new float[] {0, 1.4f, 0, 0, 0},
+                new float[] {0, 0, 1.4f, 0, 0},
+                new float[] {0, 0, 0, 1, 0},
+                new float[] {-0.2f, -0.2f, -0.2f, 0, 1}
+            });
+
+            var atributos = new ImageAttributes();
+            atributos.SetColorMatrix(matrix);
+
+            g.DrawImage(
+                original,
+                new Rectangle(0, 0, original.Width, original.Height),
+                0,
+                0,
+                original.Width,
+                original.Height,
+                GraphicsUnit.Pixel,
+                atributos);
+        }
+
+        return nueva;
     }
 }
