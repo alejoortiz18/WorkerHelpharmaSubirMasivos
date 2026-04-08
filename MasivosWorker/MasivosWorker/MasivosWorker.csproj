@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="BarCode" Version="2026.3.6" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>

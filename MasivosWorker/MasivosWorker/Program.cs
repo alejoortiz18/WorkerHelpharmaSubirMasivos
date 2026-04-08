@@ -19,6 +19,7 @@ builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<FileManagerInfraestructure>();
 builder.Services.AddSingleton<FileWatcherInfraestructure>();
 builder.Services.AddSingleton<BarcodeRegionService>();
+builder.Services.AddHttpClient<SoporteApiService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();

@@ -25,17 +25,23 @@ public class FileWatcherInfraestructure
 
     private readonly object _lockStats = new();
 
+    private long _tiempoTotalProcesamientoMs = 0;
+    private int _conteoTiempos = 0;
+
+    private readonly SoporteApiService _soporteApi;
+
     public FileWatcherInfraestructure(
         IOptions<RutasSettings> rutasOptions,
         ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco,
+        SoporteApiService soporteApi,
         FileManagerInfraestructure fileManager)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
         _barcodeRegionService = baco;
         _fileManager = fileManager;
-
+        _soporteApi = soporteApi;
         _directorioEntrada = _rutas.Procesar;
 
         Directory.CreateDirectory(_directorioEntrada);
@@ -100,6 +106,8 @@ public class FileWatcherInfraestructure
 
         string rutaProcesando = null;
 
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             _logger.LogInformation(
@@ -112,16 +120,30 @@ public class FileWatcherInfraestructure
 
             rutaProcesando = _fileManager.MoverAProcesando(ruta);
 
-            //var documento = await Task.Run(() =>
-            //    _barcodeRegionService.ProcesarPdf(rutaProcesando)
-            //);
-
             var documento = await ProcesarConReintentos(rutaProcesando, nombreArchivo);
 
             if (documento != null)
             {
+                // 🔥 1. Construir soporte
+                var soporte = $"{documento.Prefijo}{documento.Numero}";
+
+                // 🔥 2. Llamar API
+                var enviado = await _soporteApi.EnviarSoporteAsync(soporte);
+
+                // 🔥 3. Manejo del resultado (NO rompe flujo)
+                if (enviado!=null)
+                {
+                    _logger.LogWarning(
+                        "SoporteNoEnviado | Archivo={Archivo} | Soporte={Soporte}",
+                        nombreArchivo,
+                        soporte
+                    );
+                }
+
+                // 🔥 4. Mover archivo SIEMPRE (independiente del API)
                 _fileManager.MoverAProcesados(rutaProcesando, documento.NombreArchivo);
 
+                // 🔥 5. Contador
                 ActualizarContadores(ok: true);
             }
             else
@@ -160,9 +182,17 @@ public class FileWatcherInfraestructure
         }
         finally
         {
+            stopwatch.Stop();
+
             lock (_procesando)
             {
                 _procesando.Remove(ruta);
+            }
+
+            lock (_lockStats)
+            {
+                _tiempoTotalProcesamientoMs += stopwatch.ElapsedMilliseconds;
+                _conteoTiempos++;
             }
 
             _semaforo.Release();
@@ -183,11 +213,21 @@ public class FileWatcherInfraestructure
             // 🔥 LOG RESUMEN CADA 10 ARCHIVOS
             if (_procesadosTotal % 10 == 0)
             {
+                double promedio = _conteoTiempos > 0
+                    ? (double)_tiempoTotalProcesamientoMs / _conteoTiempos
+                    : 0;
+
+                double tasaError = _procesadosTotal > 0
+                    ? ((double)_procesadosError / _procesadosTotal) * 100
+                    : 0;
+
                 _logger.LogInformation(
-                    "ResumenProcesamiento | Total={Total} | OK={OK} | Error={Error}",
+                    "ResumenProcesamiento | Total={Total} | OK={OK} | Error={Error} | PromedioMs={Promedio} | ErrorPct={ErrorPct}",
                     _procesadosTotal,
                     _procesadosOk,
-                    _procesadosError
+                    _procesadosError,
+                    Math.Round(promedio, 2),
+                    Math.Round(tasaError, 2)
                 );
             }
         }
