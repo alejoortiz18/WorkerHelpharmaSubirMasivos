@@ -29,13 +29,15 @@ public class FileWatcherInfraestructure
     private int _conteoTiempos = 0;
 
     private readonly SoporteApiService _soporteApi;
+    private readonly SoporteFisicoApiService _soporteFisicoApi;
 
     public FileWatcherInfraestructure(
         IOptions<RutasSettings> rutasOptions,
         ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco,
         SoporteApiService soporteApi,
-        FileManagerInfraestructure fileManager)
+        SoporteFisicoApiService soporteFisicoApi,
+    FileManagerInfraestructure fileManager)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
@@ -43,7 +45,8 @@ public class FileWatcherInfraestructure
         _fileManager = fileManager;
         _soporteApi = soporteApi;
         _directorioEntrada = _rutas.Procesar;
-
+        _soporteFisicoApi = soporteFisicoApi;
+        _fileManager = fileManager;
         Directory.CreateDirectory(_directorioEntrada);
     }
 
@@ -118,20 +121,45 @@ public class FileWatcherInfraestructure
 
             await EsperarArchivoDisponible(ruta);
 
+            // 🔥 mover a procesando
             rutaProcesando = _fileManager.MoverAProcesando(ruta);
 
             var documento = await ProcesarConReintentos(rutaProcesando, nombreArchivo);
 
             if (documento != null)
             {
-                // 🔥 1. Construir soporte
+                // 🔥 construir soporte
                 var soporte = $"{documento.Prefijo}{documento.Numero}";
 
-                // 🔥 2. Llamar API
-                var enviado = await _soporteApi.EnviarSoporteAsync(soporte);
+                // 🔥 API 1 (datos)
+                var respuesta = await _soporteApi.EnviarSoporteAsync(soporte);
 
-                // 🔥 3. Manejo del resultado (NO rompe flujo)
-                if (enviado!=null)
+                if (respuesta != null)
+                {
+                    _logger.LogInformation(
+                        "SoporteDatosOK | Archivo={Archivo} | Soporte={Soporte} | Paciente={Paciente}",
+                        nombreArchivo,
+                        soporte,
+                        respuesta.NombrePaciente
+                    );
+
+                    // 🔥 API 2 (envío físico + archivo)
+                    var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
+                        soporte,
+                        rutaProcesando,
+                        respuesta
+                    );
+
+                    if (!enviadoFisico)
+                    {
+                        _logger.LogError(
+                            "FalloEnvioFisico | Archivo={Archivo} | Soporte={Soporte}",
+                            nombreArchivo,
+                            soporte
+                        );
+                    }
+                }
+                else
                 {
                     _logger.LogWarning(
                         "SoporteNoEnviado | Archivo={Archivo} | Soporte={Soporte}",
@@ -140,10 +168,9 @@ public class FileWatcherInfraestructure
                     );
                 }
 
-                // 🔥 4. Mover archivo SIEMPRE (independiente del API)
+                // 🔥 SIEMPRE mover a procesados
                 _fileManager.MoverAProcesados(rutaProcesando, documento.NombreArchivo);
 
-                // 🔥 5. Contador
                 ActualizarContadores(ok: true);
             }
             else

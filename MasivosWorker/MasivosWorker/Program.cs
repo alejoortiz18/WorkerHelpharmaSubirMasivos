@@ -20,6 +20,7 @@ builder.Services.AddSingleton<FileManagerInfraestructure>();
 builder.Services.AddSingleton<FileWatcherInfraestructure>();
 builder.Services.AddSingleton<BarcodeRegionService>();
 builder.Services.AddHttpClient<SoporteApiService>();
+builder.Services.AddHttpClient<SoporteFisicoApiService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();

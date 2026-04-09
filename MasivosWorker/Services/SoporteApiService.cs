@@ -52,7 +52,7 @@ public class SoporteApiService
                 _logger.LogInformation(
                     "ApiSoporteOK | Soporte={Soporte} | Paciente={Paciente}",
                     soporte,
-                    resultado?.nombrePaciente
+                    resultado?.NombrePaciente
                 );
 
                 return resultado;

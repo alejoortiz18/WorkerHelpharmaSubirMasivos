@@ -6,17 +6,34 @@ namespace Models.Dto
 {
     public class SoporteResponseDto
     {
-        public string idConvenio { get; set; }
-        public string nombreConvenio { get; set; }
-        public DateTime fecha { get; set; }
-        public string idBodega { get; set; }
-        public string nombreSede { get; set; }
-        public string tipoEntrega { get; set; }
-        public string tipoPlan { get; set; }
-        public string idCartera { get; set; }
-        public string nombrePaciente { get; set; }
-        public string celular { get; set; }
-        public string direccion { get; set; }
+        public string IdConvenio { get; set; }
+        public string NombreConvenio { get; set; }
+
+        public DateTime Fecha { get; set; }
+
+        public string IdBodega { get; set; }
+        public string NombreSede { get; set; }
+
+        public string NombreActividad { get; set; }
+
+        public string TipoEntrega { get; set; }
+        public string TipoPlan { get; set; }
+
+        public string IdCartera { get; set; }
+
+        public string NombrePaciente { get; set; }
+        public string IdTipoId { get; set; }
+
+        public int IdPaciente { get; set; }
+
+        public string Celular { get; set; }
+
+        public string Telefono { get; set; }
+
+        public string Direccion { get; set; }
+        public string Complemento { get; set; }
+        public string Observacion { get; set; }
+        public string ValorCM { get; set; }
 
         public List<MedicamentoDto> medicamentos { get; set; }
     }
