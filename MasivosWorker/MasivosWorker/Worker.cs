@@ -22,36 +22,30 @@ namespace MasivosWorker
         {
             _logger.LogInformation("Worker iniciado");
 
-            try
+            // 🔥 NO BLOQUEAR EL ARRANQUE DEL SERVICIO
+            _ = Task.Run(async () =>
             {
-               
-                _fileManager.CrearCarpetasSiNoExisten();
-                _fileManager.CrearAccesosDirectos();
-
-                _watcher.ProcesarPendientesAlIniciar();
-                _watcher.Iniciar();
-
-                _logger.LogInformation("Sistema listo y escuchando archivos...");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error inicializando el Worker");
-                throw; 
-            }
-
-            try
-            {
-                while (!stoppingToken.IsCancellationRequested)
+                try
                 {
-                    await Task.Delay(5000, stoppingToken);
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                
-            }
+                    _fileManager.CrearCarpetasSiNoExisten();
+                    _fileManager.CrearAccesosDirectos();
 
-            _logger.LogInformation("Worker detenido");
+                    _watcher.ProcesarPendientesAlIniciar();
+                    _watcher.Iniciar();
+
+                    _logger.LogInformation("Sistema listo y escuchando archivos...");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error inicializando el sistema");
+                }
+            });
+
+            // 🔥 mantener vivo el servicio
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await Task.Delay(1000, stoppingToken);
+            }
         }
     }
 }

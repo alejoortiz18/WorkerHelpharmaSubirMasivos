@@ -128,47 +128,45 @@ public class FileWatcherInfraestructure
 
             if (documento != null)
             {
-                // 🔥 construir soporte
                 var soporte = $"{documento.Prefijo}{documento.Numero}";
 
-                // 🔥 API 1 (datos)
+                // 🔥 API 1
                 var respuesta = await _soporteApi.EnviarSoporteAsync(soporte);
 
-                if (respuesta != null)
+                if (respuesta == null)
                 {
-                    _logger.LogInformation(
-                        "SoporteDatosOK | Archivo={Archivo} | Soporte={Soporte} | Paciente={Paciente}",
-                        nombreArchivo,
-                        soporte,
-                        respuesta.NombrePaciente
-                    );
-
-                    // 🔥 API 2 (envío físico + archivo)
-                    var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-                        soporte,
-                        rutaProcesando,
-                        respuesta
-                    );
-
-                    if (!enviadoFisico)
-                    {
-                        _logger.LogError(
-                            "FalloEnvioFisico | Archivo={Archivo} | Soporte={Soporte}",
-                            nombreArchivo,
-                            soporte
-                        );
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "SoporteNoEnviado | Archivo={Archivo} | Soporte={Soporte}",
+                    _logger.LogError(
+                        "FalloApiDatos | Archivo={Archivo} | Soporte={Soporte}",
                         nombreArchivo,
                         soporte
                     );
+
+                    _fileManager.MoverAError(rutaProcesando);
+                    ActualizarContadores(ok: false);
+                    return;
                 }
 
-                // 🔥 SIEMPRE mover a procesados
+                // 🔥 API 2
+                var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
+                    soporte,
+                    rutaProcesando,
+                    respuesta
+                );
+
+                if (!enviadoFisico)
+                {
+                    _logger.LogError(
+                        "FalloApiFisico | Archivo={Archivo} | Soporte={Soporte}",
+                        nombreArchivo,
+                        soporte
+                    );
+
+                    _fileManager.MoverAError(rutaProcesando);
+                    ActualizarContadores(ok: false);
+                    return;
+                }
+
+                // 🔥 SOLO SI TODO OK
                 _fileManager.MoverAProcesados(rutaProcesando, documento.NombreArchivo);
 
                 ActualizarContadores(ok: true);

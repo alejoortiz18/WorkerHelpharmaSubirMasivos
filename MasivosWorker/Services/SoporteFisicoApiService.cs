@@ -26,11 +26,20 @@ public class SoporteFisicoApiService
     {
         try
         {
+            int idConvenio = 0;
+
             using var form = new MultipartFormDataContent();
 
             // 🔥 CAMPOS OBLIGATORIOS
             form.Add(new StringContent(soporte), "soporte");
-            form.Add(new StringContent(data.IdConvenio ?? ""), "idConvenio");
+
+            if (!string.IsNullOrEmpty(data.IdConvenio))
+            {
+                int.TryParse(data.IdConvenio, out idConvenio);
+            }
+
+            form.Add(new StringContent(idConvenio.ToString()), "idConvenio");
+
             form.Add(new StringContent(data.NombreConvenio ?? ""), "nombreConvenio");
             form.Add(new StringContent(data.Fecha.ToString("yyyy-MM-dd HH:mm:ss")), "fecha");
             form.Add(new StringContent(data.IdBodega ?? ""), "idBodega");

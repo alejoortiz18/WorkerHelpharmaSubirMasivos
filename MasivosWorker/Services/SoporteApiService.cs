@@ -31,7 +31,7 @@ public class SoporteApiService
             var json = JsonSerializer.Serialize(body);
 
             var request = new HttpRequestMessage(HttpMethod.Post,
-                "https://localhost:7135/api/DocSoporte/soportes/DatosSoportes");
+                "https://api-soportes.helpharma.com.co/api/DocSoporte/soportes/DatosSoportes");
 
             request.Headers.Add("X-API-KEY", API_KEY);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");

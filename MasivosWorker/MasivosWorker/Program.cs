@@ -1,12 +1,17 @@
+using Infrastructure;
+using IronBarCode;
 using MasivosWorker;
 using Microsoft.Extensions.Options;
-using IronBarCode;
-using Microsoft.Extensions.Options;
 using Models.Dto;
-using Infrastructure;
 using Services;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// 🔥 ESTO ES LO QUE TE FALTABA
+builder.Services.AddWindowsService(options =>
+{
+    options.ServiceName = "MasivosWorker";
+});
 
 // Configuración
 builder.Services.Configure<IronBarcodeSettings>(
@@ -26,9 +31,10 @@ builder.Services.AddHttpClient<SoporteFisicoApiService>();
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
+
+// Inicializar licencia
 host.Services.GetRequiredService<IronBarcodeLicenseInitializer>();
 
-// Aplicar licencia
 var ironSettings = host.Services.GetRequiredService<IOptions<IronBarcodeSettings>>().Value;
 License.LicenseKey = ironSettings.LicenseKey;
 
