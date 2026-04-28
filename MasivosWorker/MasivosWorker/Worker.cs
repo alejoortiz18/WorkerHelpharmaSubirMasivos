@@ -22,7 +22,6 @@ namespace MasivosWorker
         {
             _logger.LogInformation("Worker iniciado");
 
-            // 🔥 NO BLOQUEAR EL ARRANQUE DEL SERVICIO
             _ = Task.Run(async () =>
             {
                 try

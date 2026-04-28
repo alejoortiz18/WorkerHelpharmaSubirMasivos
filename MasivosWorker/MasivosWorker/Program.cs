@@ -2,6 +2,7 @@ using Infrastructure;
 using IronBarCode;
 using MasivosWorker;
 using Microsoft.Extensions.Options;
+using Models;
 using Models.Dto;
 using Services;
 
@@ -29,7 +30,8 @@ builder.Services.AddHttpClient<SoporteFisicoApiService>();
 
 // Worker
 builder.Services.AddHostedService<Worker>();
-
+builder.Services.Configure<FileSettings>(
+    builder.Configuration.GetSection("FileSettings"));
 var host = builder.Build();
 
 // Inicializar licencia

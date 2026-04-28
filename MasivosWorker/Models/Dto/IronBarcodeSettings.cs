@@ -7,5 +7,6 @@ namespace Models.Dto
     public class IronBarcodeSettings
     {
         public string LicenseKey { get; set; }
+
     }
 }

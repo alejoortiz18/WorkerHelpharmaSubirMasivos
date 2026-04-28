@@ -1,7 +1,9 @@
-﻿using Models.Dto;
+﻿using Google.Protobuf.Reflection;
+using IWshRuntimeLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using IWshRuntimeLibrary;
+using Models;
+using Models.Dto;
 using File = System.IO.File;
 
 namespace Infrastructure
@@ -10,13 +12,16 @@ namespace Infrastructure
     {
         private readonly RutasSettings _rutas;
         private readonly ILogger<FileManagerInfraestructure> _logger;
+        private readonly string _fileName;
 
         public FileManagerInfraestructure(
             IOptions<RutasSettings> rutasOptions,
+            IOptions<FileSettings> fileOptions,
             ILogger<FileManagerInfraestructure> logger)
         {
             _rutas = rutasOptions.Value;
             _logger = logger;
+            _fileName = fileOptions.Value.KeyName;
         }
 
         public void CrearCarpetasSiNoExisten()
@@ -66,7 +71,7 @@ namespace Infrastructure
         public string MoverAProcesando(string rutaOrigen)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-            var destino = Path.Combine(_rutas.Procesando, nombre);
+            var destino = Path.Combine(_rutas.Procesando, $"{_fileName}{nombre}");
 
             File.Move(rutaOrigen, destino, true);
 
@@ -77,7 +82,7 @@ namespace Infrastructure
 
         public void MoverAProcesados(string rutaOrigen, string nuevoNombre)
         {
-            var destino = Path.Combine(_rutas.Procesados, nuevoNombre);
+            var destino = Path.Combine(_rutas.Procesados, $"{_fileName}{nuevoNombre}");
 
             File.Move(rutaOrigen, destino, true);
 
@@ -87,7 +92,7 @@ namespace Infrastructure
         public void MoverAError(string rutaOrigen)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-            var destino = Path.Combine(_rutas.Error, nombre);
+            var destino = Path.Combine(_rutas.Error, $"{nombre}");
 
             File.Move(rutaOrigen, destino, true);
 
