@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Models;
 using Models.Dto;
 using Services;
 
@@ -16,9 +17,12 @@ public class FileWatcherInfraestructure
     private readonly string _directorioEntrada;
 
     private readonly HashSet<string> _procesando = new();
-    private readonly SemaphoreSlim _semaforo = new(2);
+    private readonly SemaphoreSlim _semaforo;
+    private readonly int _maxReintentos;
+    private readonly int _esperaMs;
+    private CancellationToken _stoppingToken;
 
-    // 🔥 CONTADORES
+    // CONTADORES
     private int _procesadosOk = 0;
     private int _procesadosError = 0;
     private int _procesadosTotal = 0;
@@ -34,11 +38,12 @@ public class FileWatcherInfraestructure
 
     public FileWatcherInfraestructure(
         IOptions<RutasSettings> rutasOptions,
+        IOptions<FileSettings> fileSettings,
         ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco,
         SoporteApiService soporteApi,
         SoporteFisicoApiService soporteFisicoApi,
-    FileManagerInfraestructure fileManager)
+        FileManagerInfraestructure fileManager)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
@@ -47,12 +52,16 @@ public class FileWatcherInfraestructure
         _soporteApi = soporteApi;
         _directorioEntrada = _rutas.Procesar;
         _soporteFisicoApi = soporteFisicoApi;
-        _fileManager = fileManager;
+        _semaforo = new SemaphoreSlim(fileSettings.Value.MaxArchivosConcurrentes);
+        _maxReintentos = fileSettings.Value.BarcodeMaxReintentos;
+        _esperaMs = fileSettings.Value.BarcodeEsperaMs;
         Directory.CreateDirectory(_directorioEntrada);
     }
 
-    public void Iniciar()
+    public void Iniciar(CancellationToken stoppingToken)
     {
+        _stoppingToken = stoppingToken;
+
         _watcher = new FileSystemWatcher(_directorioEntrada)
         {
             Filter = "*.pdf",
@@ -65,11 +74,20 @@ public class FileWatcherInfraestructure
             Task.Run(() => ProcesarArchivoAsync(e.FullPath));
         };
 
+        // Changed se dispara cuando el handle de escritura se cierra (copia completa),
+        // lo que garantiza una segunda oportunidad para archivos grandes o lentos.
+        _watcher.Changed += (s, e) =>
+        {
+            Task.Run(() => ProcesarArchivoAsync(e.FullPath));
+        };
+
         _logger.LogInformation("Watcher iniciado en carpeta Procesar");
     }
 
-    public void ProcesarPendientesAlIniciar()
+    public void ProcesarPendientesAlIniciar(CancellationToken stoppingToken)
     {
+        _stoppingToken = stoppingToken;
+
         try
         {
             var archivos = Directory.GetFiles(_rutas.Procesando, "*.pdf");
@@ -87,7 +105,7 @@ public class FileWatcherInfraestructure
 
             foreach (var archivo in archivos)
             {
-                Task.Run(() => ProcesarArchivoAsync(archivo));
+                Task.Run(() => ProcesarArchivoAsync(archivo, yaEnProcesando: true));
             }
         }
         catch (Exception ex)
@@ -96,7 +114,7 @@ public class FileWatcherInfraestructure
         }
     }
 
-    private async Task ProcesarArchivoAsync(string ruta)
+    private async Task ProcesarArchivoAsync(string ruta, bool yaEnProcesando = false)
     {
         await _semaforo.WaitAsync();
 
@@ -122,8 +140,8 @@ public class FileWatcherInfraestructure
 
             await EsperarArchivoDisponible(ruta);
 
-            // 🔥 mover a procesando
-            rutaProcesando = _fileManager.MoverAProcesando(ruta);
+            // mover a procesando (si ya viene de esa carpeta, no mover)
+            rutaProcesando = yaEnProcesando ? ruta : _fileManager.MoverAProcesando(ruta);
 
             var documento = await ProcesarConReintentos(rutaProcesando, nombreArchivo);
 
@@ -200,9 +218,12 @@ public class FileWatcherInfraestructure
                 if (!string.IsNullOrEmpty(rutaProcesando) && File.Exists(rutaProcesando))
                     _fileManager.MoverAError(rutaProcesando);
                 else if (File.Exists(ruta))
-                    _fileManager.MoverAError(ruta);
+                    _fileManager.MoverAErrorDesdeOrigen(ruta);
             }
-            catch { }
+            catch (Exception moveEx)
+            {
+                _logger.LogError(moveEx, "ErrorMoverAError | Archivo={Archivo}", nombreArchivo);
+            }
 
             ActualizarContadores(ok: false);
         }
@@ -261,20 +282,26 @@ public class FileWatcherInfraestructure
 
     private async Task EsperarArchivoDisponible(string ruta)
     {
-        int intentos = 10;
+        int intentos = 30;
 
         for (int i = 0; i < intentos; i++)
         {
+            _stoppingToken.ThrowIfCancellationRequested();
+
             try
             {
-                using (FileStream stream = File.Open(ruta, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (FileStream stream = File.Open(ruta, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     return;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
-                await Task.Delay(500);
+                await Task.Delay(500, _stoppingToken);
             }
         }
 
@@ -295,9 +322,7 @@ public class FileWatcherInfraestructure
 
     private async Task<DocumentoProcesadoDto?> ProcesarConReintentos(string ruta, string nombreArchivo)
     {
-        int maxIntentos = 3;
-
-        for (int intento = 1; intento <= maxIntentos; intento++)
+        for (int intento = 1; intento <= _maxReintentos; intento++)
         {
             try
             {
@@ -335,8 +360,8 @@ public class FileWatcherInfraestructure
                 );
             }
 
-            // 🔥 pequeña espera entre intentos
-            await Task.Delay(500);
+            // espera entre intentos
+            await Task.Delay(_esperaMs, _stoppingToken);
         }
 
         return null;

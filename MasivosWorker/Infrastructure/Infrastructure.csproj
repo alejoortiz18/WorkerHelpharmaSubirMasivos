@@ -16,10 +16,5 @@
     <ProjectReference Include="..\Services\Services.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Reference Include="lbEscaneaDocs">
-      <HintPath>..\..\..\..\LibEscaneaCodigo\lbEscaneaDocs.dll</HintPath>
-    </Reference>
-  </ItemGroup>
 
 </Project>

@@ -11,7 +11,5 @@ namespace Models.Dto
         public string Numero { get; set; }
 
         public string NombreArchivo { get; set; }
-
-        public byte[] Archivo { get; set; }
     }
 }

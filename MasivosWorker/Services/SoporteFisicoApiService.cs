@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Models.Dto;
 
 namespace Services;
@@ -10,13 +11,15 @@ public class SoporteFisicoApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<SoporteFisicoApiService> _logger;
+    private readonly string _token;
+    private readonly string _idUsuario;
 
-    private const string TOKEN = "4050281|BTH7oV8sR3n5pc4Ko8LHxpnhbWiJKga8p6M3IAjw";
-
-    public SoporteFisicoApiService(HttpClient httpClient, ILogger<SoporteFisicoApiService> logger)
+    public SoporteFisicoApiService(HttpClient httpClient, ILogger<SoporteFisicoApiService> logger, IOptions<ApiCredentialsSettings> credenciales)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _token = credenciales.Value.SoporteFisicoToken;
+        _idUsuario = credenciales.Value.IdUsuario;
     }
 
     public async Task<bool> EnviarSoporteFisicoAsync(
@@ -58,8 +61,8 @@ public class SoporteFisicoApiService
             form.Add(new StringContent(data.Observacion ?? ""), "observacion");
             form.Add(new StringContent(data.ValorCM ?? "0"), "valorCM");
 
-            // 🔥 CAMPOS ADICIONALES (puedes ajustar luego)
-            form.Add(new StringContent("system"), "idUsuario");
+            // CAMPOS ADICIONALES
+            form.Add(new StringContent(_idUsuario), "idUsuario");
 
             // 🔥 MEDICAMENTOS (JSON)
             var medicamentosJson = JsonSerializer.Serialize(data.medicamentos);
@@ -76,7 +79,7 @@ public class SoporteFisicoApiService
             var request = new HttpRequestMessage(HttpMethod.Post,
                 "https://intranet.helpharma.com/api/v1/soporte/fisico");
 
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", TOKEN);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             request.Content = form;

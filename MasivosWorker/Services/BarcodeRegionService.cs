@@ -65,7 +65,16 @@ public class BarcodeRegionService
         {
             using var pdf = PdfDocument.FromFile(rutaPdf);
 
-            using var bitmap = (Bitmap)pdf.ToBitmap(400).First(); // 🔥 subimos un poco DPI
+            _logger.LogInformation(
+                "LeyendoPdf | Archivo={Archivo} | Paginas={Paginas}",
+                Path.GetFileName(rutaPdf),
+                pdf.PageCount
+            );
+
+            // Solo renderizar la primera página — el archivo PDF completo se conserva intacto
+            using var primeraPagina = pdf.CopyPage(0);
+            var imagenes = primeraPagina.ToBitmap(400).ToList();
+            using var bitmap = (Bitmap)imagenes[0];
 
             var opciones = new BarcodeReaderOptions
             {

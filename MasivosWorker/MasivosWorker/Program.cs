@@ -1,7 +1,5 @@
 using Infrastructure;
-using IronBarCode;
 using MasivosWorker;
-using Microsoft.Extensions.Options;
 using Models;
 using Models.Dto;
 using Services;
@@ -21,6 +19,9 @@ builder.Services.Configure<IronBarcodeSettings>(
 builder.Services.Configure<RutasSettings>(
     builder.Configuration.GetSection("Rutas"));
 
+builder.Services.Configure<ApiCredentialsSettings>(
+    builder.Configuration.GetSection("ApiCredentials"));
+
 builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<FileManagerInfraestructure>();
 builder.Services.AddSingleton<FileWatcherInfraestructure>();
@@ -36,8 +37,5 @@ var host = builder.Build();
 
 // Inicializar licencia
 host.Services.GetRequiredService<IronBarcodeLicenseInitializer>();
-
-var ironSettings = host.Services.GetRequiredService<IOptions<IronBarcodeSettings>>().Value;
-License.LicenseKey = ironSettings.LicenseKey;
 
 host.Run();

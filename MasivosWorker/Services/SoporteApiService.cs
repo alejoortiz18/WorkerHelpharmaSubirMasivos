@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Models.Dto;
 
 namespace Services;
@@ -10,13 +11,13 @@ public class SoporteApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<SoporteApiService> _logger;
+    private readonly string _apiKey;
 
-    private const string API_KEY = "ABC123456789";
-
-    public SoporteApiService(HttpClient httpClient, ILogger<SoporteApiService> logger)
+    public SoporteApiService(HttpClient httpClient, ILogger<SoporteApiService> logger, IOptions<ApiCredentialsSettings> credenciales)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _apiKey = credenciales.Value.SoporteApiKey;
     }
 
     public async Task<SoporteResponseDto?> EnviarSoporteAsync(string soporte)
@@ -33,7 +34,7 @@ public class SoporteApiService
             var request = new HttpRequestMessage(HttpMethod.Post,
                 "https://api-soportes.helpharma.com.co/api/DocSoporte/soportes/DatosSoportes");
 
-            request.Headers.Add("X-API-KEY", API_KEY);
+            request.Headers.Add("X-API-KEY", _apiKey);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);

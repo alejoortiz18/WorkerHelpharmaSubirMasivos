@@ -4,4 +4,5 @@
   <Project Path="MasivosWorker/MasivosWorker.csproj" />
   <Project Path="Models/Models.csproj" />
   <Project Path="Services/Services.csproj" />
+  <Project Path="Tests/Tests.csproj" />
 </Solution>

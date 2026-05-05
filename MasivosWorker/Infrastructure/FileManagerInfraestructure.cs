@@ -1,5 +1,4 @@
-﻿using Google.Protobuf.Reflection;
-using IWshRuntimeLibrary;
+﻿using IWshRuntimeLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Models;
@@ -97,6 +96,20 @@ namespace Infrastructure
             File.Move(rutaOrigen, destino, true);
 
             _logger.LogWarning($"Archivo movido a ERROR: {nombre}");
+        }
+
+        // Aplica prefijo aunque el archivo venga de /procesar (sin prefijo aún)
+        public void MoverAErrorDesdeOrigen(string rutaOrigen)
+        {
+            var nombre = Path.GetFileName(rutaOrigen);
+
+            // Si ya tiene el prefijo (viene de /Procesando), no lo duplica
+            var nombreFinal = nombre.StartsWith(_fileName) ? nombre : $"{_fileName}{nombre}";
+            var destino = Path.Combine(_rutas.Error, nombreFinal);
+
+            File.Move(rutaOrigen, destino, true);
+
+            _logger.LogWarning($"Archivo movido a ERROR (desde origen): {nombreFinal}");
         }
     }
 }
