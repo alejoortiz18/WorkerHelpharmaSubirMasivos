@@ -8,7 +8,7 @@
 | **Proyecto** | `MoverDocumentos/` *(nuevo)* |
 | **Servicio Windows** | `MoverDocumentos` |
 | **Fecha** | 2026-06-02 |
-| **Estado** | Por iniciar |
+| **Estado** | Implementado (código base); piloto W1-61 pendiente |
 
 ---
 
@@ -154,16 +154,16 @@ flowchart LR
 | ID | Requerimiento | Prioridad |
 |----|---------------|-----------|
 | RF-08.1 | Generar **1 TXT por lote** en `\\192.168.0.69\ArchivosScaneados\ArchivosNuevos` | 🔴 |
-| RF-08.2 | Nombre sugerido: `{usuario}-{fecha}-{hora}.txt` — ej. `alejandro.ortiz-2026-06-02-09am.txt` | 🔴 |
-| RF-08.3 | Contenido: **una sola línea** con ruta absoluta a la carpeta `procesar` del lote | 🔴 |
+| RF-08.2 | Nombre: `{usuario}-{YYYY-MM-DD} {HH-mm-ss}{AM\|PM}.txt` — ej. `alejandro.ortiz-2026-06-03 08-42-51AM.txt` | 🔴 |
+| RF-08.3 | Contenido: **una sola línea** con ruta UNC absoluta a `procesar` (Worker 2 la lee al abrir el archivo) | 🔴 |
 | RF-08.4 | Cierre de lote por **inactividad** configurable (default: 60 s sin nuevos PDF) | 🔴 |
 | RF-08.5 | Un lote agrupa movimientos del mismo `{usuario}` + `{fecha}` | 🔴 |
 | RF-08.6 | No generar TXT duplicado para la misma ruta `procesar` si ya se notificó y no hubo nuevos archivos | 🟡 |
 
-**Ejemplo de contenido del TXT:**
+**Ejemplo de contenido (lo que Worker 2 lee al abrir el TXT):**
 
 ```text
-\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-02\procesar
+\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03\procesar
 ```
 
 **Referencia manual:** §5.8
@@ -272,7 +272,7 @@ MoverDocumentos/
   },
   "Lote": {
     "SegundosInactividadParaCerrarLote": 60,
-    "FormatoHoraEnNombreTxt": "hhtt"
+    "FormatoHoraEnNombreTxt": "yyyy-MM-dd HH-mm-ss tt"
   },
   "Archivo": {
     "EsperaIntentos": 120,

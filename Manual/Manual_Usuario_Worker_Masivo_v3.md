@@ -374,14 +374,25 @@ Nunca sobrescribir.
 | Campo | Valor |
 |-------|-------|
 | **Cantidad** | 1 TXT por lote (criterio de lote: definir en implementación — ej. por ventana de tiempo o por cierre manual) |
-| **Nombre ejemplo** | `alejandro.ortiz-2026-06-02-09am.txt` |
-| **Ruta** | `\\192.168.0.69\ArchivosScaneados\ArchivosNuevos` |
-| **Contenido** | Una sola línea: ruta absoluta a la carpeta `procesar` del lote |
+| **Nombre ejemplo** | `alejandro.ortiz-2026-06-03 08-42-51AM.txt` |
+| **Patrón de nombre** | `{usuario}-{YYYY-MM-DD} {HH-mm-ss}{AM\|PM}.txt` |
+| **Ruta carpeta** | `\\192.168.0.69\ArchivosScaneados\ArchivosNuevos` |
+| **Contenido** | **Una sola línea** con la ruta UNC absoluta a la carpeta `procesar` del lote |
 
-Ejemplo de contenido:
+> El **nombre del archivo** identifica el lote (usuario, fecha, hora). La **ruta a procesar** va **dentro** del archivo, no se deduce del nombre.
+
+Ejemplo de contenido (línea 1):
 
 ```text
-\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-02\procesar
+\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03\procesar
+```
+
+Ejemplo en carpeta `ArchivosNuevos`:
+
+```text
+ArchivosNuevos\
+├── alejandro.ortiz-2026-06-03 08-41-20AM.txt
+└── alejandro.ortiz-2026-06-03 08-42-51AM.txt   ← cada uno apunta a procesar vía su contenido
 ```
 
 ### 5.9 Unidad compartida caída
@@ -417,7 +428,19 @@ Escuchar permanentemente:
 \\192.168.0.69\ArchivosScaneados\ArchivosNuevos
 ```
 
-Por cada archivo `.txt` detectado, iniciar un ciclo de procesamiento de lote.
+Por cada archivo `.txt` **nuevo** detectado en esa carpeta:
+
+1. **Abrir el archivo** (no usar el nombre del TXT para inferir la ruta).
+2. **Leer la primera línea** — ahí viene la ruta UNC que debe procesarse.
+3. Iniciar el ciclo de procesamiento sobre esa carpeta `procesar`.
+
+```text
+ArchivosNuevos\alejandro.ortiz-2026-06-03 08-42-51AM.txt
+        │
+        │  (abrir y leer línea 1)
+        ▼
+\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03\procesar  ← carpeta a procesar
+```
 
 ### 6.2 Procesamiento secuencial
 
@@ -427,11 +450,23 @@ Por cada archivo `.txt` detectado, iniciar un ciclo de procesamiento de lote.
 | Flujo | TXT1 → completar todo el ciclo → TXT2 → completar todo el ciclo |
 | Paralelismo | No procesar dos lotes en paralelo |
 
-### 6.3 Lectura de lote
+### 6.3 Lectura de lote (contenido del TXT)
 
-1. Detectar archivo `.txt` en `ArchivosNuevos`.
-2. Abrir y leer la única línea (ruta a `procesar`).
-3. Ejemplo: `\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-02\procesar`.
+| Paso | Acción |
+|------|--------|
+| 1 | Detectar archivo `.txt` en `ArchivosNuevos` (ej. `alejandro.ortiz-2026-06-03 08-42-51AM.txt`) |
+| 2 | **Abrir el archivo** y leer **solo la línea 1** (trim espacios/saltos de línea) |
+| 3 | Esa línea es la **ruta absoluta** a la carpeta `procesar` del lote |
+| 4 | Validar que la carpeta existe y contiene (o recibirá) PDFs |
+| 5 | Derivar rutas hermanas del mismo día: `procesando`, `error`, `procesaria`, `noprocesados`, `procesados`, `log` |
+
+**Ejemplo real (línea 1 del TXT):**
+
+```text
+\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03\procesar
+```
+
+**Regla crítica:** la ruta de procesamiento **siempre** se obtiene del **contenido** del TXT, nunca del nombre del archivo.
 
 ### 6.4 Tamaño de lote
 
@@ -495,7 +530,19 @@ Si OpenAI falla (timeout, autenticación, caída API, límite, error inesperado)
 
 1. Reintentar **3 veces**.
 2. Si persiste el fallo → mover documentos del lote a `noprocesados`.
-3. Enviar **1 correo por lote fallido** (cuenta y SMTP parametrizables).
+3. Enviar **1 correo por lote fallido**.
+
+#### Configuración de correo (fallo OpenAI)
+
+| Campo | Valor |
+|-------|-------|
+| **Remitente (De)** | `sistemas.helpharma@zentria.com.co` |
+| **Destinatarios activos (Para)** | `alejandro.ortiz@zentria.com.co` |
+| **Destinatarios pendientes** | `diana.garces@zentria.com.co` *(documentado; activar en fase posterior)* |
+| **Configuración** | `appsettings.json` → sección `Email` |
+| **SMTP** | Parametrizar host, puerto y credenciales por entorno (no en código) |
+
+> **Fase actual:** el correo se envía **solo** a `alejandro.ortiz@zentria.com.co`. `diana.garces@zentria.com.co` queda registrada para habilitarse cuando operaciones lo confirme.
 
 **Ejemplo de cuerpo del correo:**
 
@@ -524,13 +571,32 @@ PDF corrupto o ilegible → mover directamente a `noprocesados` (sin reproceso a
 
 Si falla endpoint 1 o endpoint 2 → mover a `noprocesados`. **No** reprocesar automáticamente.
 
-### 6.14 Logs diarios
+### 6.14 Logs diarios (decisión: un archivo por día en carpeta `log`)
+
+Se mantiene **un log por fecha de escaneo**, dentro de la carpeta del día (no un CSV único en la raíz del usuario).
 
 | Campo | Valor |
 |-------|-------|
-| **Archivo** | `{YYYY-MM-DD}.txt` en carpeta `log` |
-| **Formato ejemplo** | `CantidadProcesados:100` / `NoProcesados:12` |
-| **Comportamiento** | Acumulativo por día; cada lote suma |
+| **Ruta** | `\\192.168.0.69\ArchivosScaneados\{usuario}\{fecha}\log\{fecha}.txt` |
+| **Ejemplo** | `\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03\log\2026-06-03.txt` |
+| **Formato** | Dos líneas acumulativas: `CantidadProcesados:N` y `NoProcesados:M` |
+| **Comportamiento** | Acumulativo por día; cada lote de Worker 2 **suma** sobre el mismo archivo |
+| **Quién escribe** | Worker 2 (por lote) y portal MVC (reproceso manual exitoso, §7.8) |
+| **Quién lee** | Portal MVC (dashboard y, si aplica, resumen del calendario) |
+
+**Ejemplo de contenido:**
+
+```text
+CantidadProcesados:100
+NoProcesados:12
+```
+
+**Derivación de ruta (Worker 2):** desde la ruta `procesar` del TXT de lote:
+
+```text
+...\alejandro.ortiz\2026-06-03\procesar
+→ ...\alejandro.ortiz\2026-06-03\log\2026-06-03.txt
+```
 
 ### 6.15 Limpieza al terminar lote
 
@@ -585,16 +651,50 @@ En caso de dudas contacte al administrador.
 
 ### 7.3 Home — selección de fecha
 
-- Mostrar calendario de fechas disponibles para el usuario autenticado.
-- Formato: `YYYY-MM-DD`.
-- Validar existencia de `\\192.168.0.69\ArchivosScaneados\{usuario}\{fecha}`.
+El MVC trabaja sobre la carpeta del usuario en red:
 
-### 7.4 Dashboard
+```text
+\\192.168.0.69\ArchivosScaneados\{usuario}\
+├── 2026-06-02\
+├── 2026-06-03\
+└── 2026-06-04\
+```
 
-Mostrar desde el log del día (`log\{fecha}.txt`):
+#### Cómo obtener las fechas disponibles
 
-- `CantidadProcesados`
-- `NoProcesados`
+| Paso | Acción | ¿Lee logs? |
+|------|--------|------------|
+| 1 | Listar subcarpetas de `{RaizUnc}\{usuario}\` | No |
+| 2 | Filtrar solo nombres con formato `YYYY-MM-DD` | No |
+| 3 | Ordenar descendente (más reciente primero) | No |
+| 4 | Mostrar calendario o lista clicables | No |
+
+> **Importante:** las **fechas del calendario** salen de las **carpetas** que crea Worker 1 (`2026-06-03`, etc.), **no** hace falta abrir todos los logs solo para saber qué fechas existen.
+
+#### Cuándo sí leer logs en el Home (opcional)
+
+Si el calendario debe mostrar **totales por fecha** sin entrar al dashboard (ej. “03/06 — 100 procesados, 12 pendientes”):
+
+1. Por cada carpeta `{fecha}` detectada en el paso anterior,
+2. Abrir **solo** `{fecha}\log\{fecha}.txt`,
+3. Parsear `CantidadProcesados` y `NoProcesados`.
+
+Eso implica **un archivo de log por fecha** (varias carpetas en red). Es aceptable porque cada archivo es pequeño; conviene **cachear** el listado en sesión y refrescar al elegir otra fecha.
+
+Servicio sugerido en MVC: `UncFileService.ListarFechasAsync(usuario)` y, si aplica, `ObtenerResumenLogsAsync(usuario)`.
+
+### 7.4 Dashboard (fecha seleccionada)
+
+Al elegir **una** fecha (`YYYY-MM-DD`):
+
+1. Validar que existe `\\192.168.0.69\ArchivosScaneados\{usuario}\{fecha}`.
+2. Leer **un solo** archivo: `log\{fecha}.txt`.
+3. Mostrar:
+   - `CantidadProcesados`
+   - `NoProcesados`
+4. Si el log no existe aún (día recién creado, sin procesamiento): mostrar `0` / `0`.
+
+**No** es necesario releer logs de otras fechas en esta pantalla.
 
 ### 7.5 Tabla de no procesados
 
@@ -686,7 +786,7 @@ El archivo permanece en `noprocesados`.
 | Worker 2 — lotes de 3 archivos | ⏳ Pendiente | Hoy procesa archivo a archivo |
 | Worker 2 — carpetas `procesaria`, `noprocesados`, log | ⏳ Pendiente | |
 | Worker 2 — OpenAI contingencia | ⏳ Pendiente | |
-| Worker 2 — correo por lote fallido | ⏳ Pendiente | Parametrizar SMTP |
+| Worker 2 — correo por lote fallido | ⏳ Pendiente | Remitente: `sistemas.helpharma@zentria.com.co`; Para: `alejandro.ortiz@zentria.com.co` |
 | Worker 1 — `MoverDocumentos` | ⏳ Por crear | Carpeta del proyecto aún no existe |
 | Portal MVC — `SitioVisualArchivosNoProcesados` | ⏳ Por crear | Carpeta del proyecto aún no existe |
 | Registro en `usuarios.txt` | ⏳ Pendiente | Worker 1 + validación login MVC |

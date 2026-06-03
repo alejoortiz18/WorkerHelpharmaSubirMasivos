@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MoverDocumentos.Core/MoverDocumentos.Core.csproj" />
+  <Project Path="MoverDocumentos.Tests/MoverDocumentos.Tests.csproj" />
+  <Project Path="MoverDocumentos/MoverDocumentos.csproj" />
+</Solution>

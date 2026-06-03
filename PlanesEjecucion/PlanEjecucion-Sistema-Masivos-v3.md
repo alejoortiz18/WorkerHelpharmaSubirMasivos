@@ -188,8 +188,8 @@ Cada tarea incluye:
 |----|-------|-----------|--------|------------|
 | W1-40 | Implementar `LoteService`: acumular movimientos en lote abierto por `{usuario}+{fecha}` | 🔴 | ⏳ | W1-32 |
 | W1-41 | Cerrar lote tras `SegundosInactividadParaCerrarLote` sin nuevos PDF (definido en INF-06) | 🔴 | ⏳ | W1-40, INF-06 |
-| W1-42 | Al cerrar: escribir TXT en `{RaizUnc}\ArchivosNuevos\{usuario}-{fecha}-{hora}.txt` | 🔴 | ⏳ | W1-41 |
-| W1-43 | Contenido del TXT: una línea con ruta absoluta a `...\procesar` | 🔴 | ⏳ | W1-42 |
+| W1-42 | Al cerrar: escribir TXT en `{RaizUnc}\ArchivosNuevos\{usuario}-{yyyy-MM-dd} {HH-mm-ss tt}.txt` | 🔴 | ⏳ | W1-41 |
+| W1-43 | Contenido del TXT: **línea 1** = ruta UNC absoluta a `...\procesar` (Worker 2 la lee al abrir el archivo) | 🔴 | ⏳ | W1-42 |
 | W1-44 | Evitar TXT duplicado si la ruta de `procesar` no cambió y el lote ya fue notificado | 🟡 | ⏳ | W1-42 |
 | W1-45 | Test: tras mover 2 PDF y esperar inactividad, existe exactamente 1 TXT con ruta correcta | 🔴 | ⏳ | W1-43 |
 
@@ -234,6 +234,8 @@ Servicio **MoverDocumentos** instalado en PC piloto que:
 ---
 
 # Fase 2 — Worker 2: adaptar `MasivosWorker` (ya existente)
+
+> **Plan detallado:** [Individual/CreacionWorker2.md](Individual/CreacionWorker2.md) — requerimientos RF-01…RF-12, línea base, gaps, tareas, pruebas y DoD.
 
 **Proyecto = Worker 2:** `MasivosWorker/`  
 **Servicio Windows actual:** `MasivosWorker` (registrado con `AddWindowsService`)  
@@ -306,9 +308,9 @@ PDF en procesar → procesando → barcode (pág. 1) → API DatosSoportes → A
 
 | ID | Tarea | Prioridad | Estado | Depende de |
 |----|-------|-----------|--------|------------|
-| W2-10 | Nuevo `LoteWatcherInfrastructure`: watcher en `{RaizUnc}\ArchivosNuevos\*.txt` (convive con `FileWatcherInfraestructure` vía `ModoOperacion`) | 🔴 | ⏳ | W2-00b |
+| W2-10 | Nuevo `LoteWatcherInfrastructure`: watcher en `{RaizUnc}\ArchivosNuevos\*.txt`; al detectar → **abrir TXT y leer línea 1** (ruta `procesar`) | 🔴 | ⏳ | W2-00b |
 | W2-11 | Cola secuencial: un TXT a la vez (`SemaphoreSlim(1)` o canal único) | 🔴 | ⏳ | W2-10 |
-| W2-12 | Leer línea del TXT → validar que carpeta `procesar` existe | 🔴 | ⏳ | W2-10 |
+| W2-12 | `LeerRutaProcesarDesdeTxt`: línea 1 del contenido → validar que carpeta `procesar` existe (**no** usar nombre del TXT) | 🔴 | ⏳ | W2-10 |
 | W2-13 | Al finalizar lote: eliminar TXT procesado | 🔴 | ⏳ | W2-10 |
 | W2-14 | Desactivar o condicionar watcher antiguo en `C:\Masivos\procesar` (flag `ModoLegacy`) | 🟡 | ⏳ | W2-10 |
 
@@ -364,9 +366,10 @@ PDF en procesar → procesando → barcode (pág. 1) → API DatosSoportes → A
 
 | ID | Tarea | Prioridad | Estado | Depende de |
 |----|-------|-----------|--------|------------|
-| W2-50 | `EmailNotificationService` parametrizable (SMTP, remitente, destinatarios) | 🔴 | ⏳ | W2-44 |
+| W2-50 | `EmailNotificationService`: remitente `sistemas.helpharma@zentria.com.co`; destinatario activo `alejandro.ortiz@zentria.com.co` | 🔴 | ⏳ | W2-44 |
 | W2-51 | 1 correo por lote fallido OpenAI con: usuario, fecha, cantidad, ruta, mensaje error | 🔴 | ⏳ | W2-50 |
 | W2-52 | Extraer usuario y fecha desde ruta UNC del lote | 🟡 | ⏳ | W2-51 |
+| W2-53 | Registrar `diana.garces@zentria.com.co` en `DestinatariosPendientes` (sin envío hasta activación) | 🟡 | ⏳ | W2-50 |
 
 **Referencia manual:** §6.10
 
@@ -498,10 +501,11 @@ builder.Services.AddSoporteHelpharmaIntegracion(builder.Configuration);
 
 | ID | Tarea | Prioridad | Estado | Depende de |
 |----|-------|-----------|--------|------------|
-| MVC-20 | Home: listar fechas (`YYYY-MM-DD`) existentes bajo `{RaizUnc}\{usuario}\` | 🔴 | ⏳ | MVC-12 |
-| MVC-21 | Validar existencia de carpeta antes de navegar | 🔴 | ⏳ | MVC-20 |
-| MVC-22 | Dashboard: leer `log\{fecha}.txt` y mostrar `CantidadProcesados` / `NoProcesados` | 🔴 | ⏳ | MVC-20, W2-62 |
+| MVC-20 | Home: `ListarFechasAsync` — escanear subcarpetas `{RaizUnc}\{usuario}\` con patrón `YYYY-MM-DD` (sin leer logs) | 🔴 | ⏳ | MVC-12 |
+| MVC-21 | Validar existencia de carpeta `{fecha}` antes de navegar | 🔴 | ⏳ | MVC-20 |
+| MVC-22 | Dashboard: leer **solo** `{fecha}\log\{fecha}.txt` de la fecha seleccionada | 🔴 | ⏳ | MVC-20, W2-62 |
 | MVC-23 | UI: calendario o lista de fechas clicables | 🟡 | ⏳ | MVC-20 |
+| MVC-24 | *(Opcional)* Resumen en calendario: leer log de cada `{fecha}` listada; cachear en sesión | 🟡 | ⏳ | MVC-20 |
 
 **Referencia manual:** §7.3, §7.4
 
