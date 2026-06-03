@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Models;
 using Models.Dto;
@@ -15,11 +16,19 @@ public class FileWatcherInfraestructure
     private readonly FileManagerInfraestructure _fileManager;
 
     private readonly string _directorioEntrada;
+    private readonly string _directorioEntradaNormalizado;
+    private readonly string _directorioProcesandoNormalizado;
 
-    private readonly HashSet<string> _procesando = new();
+    /// <summary>Un turno por ruta: si llegan varios eventos del watcher, se encolan y todos ejecutan el flujo (no se descartan).</summary>
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _turnosPorArchivo =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly SemaphoreSlim _semaforo;
     private readonly int _maxReintentos;
     private readonly int _esperaMs;
+    private readonly int _archivoEsperaIntentos;
+    private readonly int _archivoEsperaMs;
+    private readonly int _archivoLecturasEstables;
     private CancellationToken _stoppingToken;
 
     // CONTADORES
@@ -32,8 +41,7 @@ public class FileWatcherInfraestructure
     private long _tiempoTotalProcesamientoMs = 0;
     private int _conteoTiempos = 0;
 
-    private readonly SoporteApiService _soporteApi;
-    private readonly SoporteFisicoApiService _soporteFisicoApi;
+    private readonly SoporteProcesamientoService _soporteProcesamiento;
 
 
     public FileWatcherInfraestructure(
@@ -41,22 +49,28 @@ public class FileWatcherInfraestructure
         IOptions<FileSettings> fileSettings,
         ILogger<FileWatcherInfraestructure> logger,
         BarcodeRegionService baco,
-        SoporteApiService soporteApi,
-        SoporteFisicoApiService soporteFisicoApi,
+        SoporteProcesamientoService soporteProcesamiento,
         FileManagerInfraestructure fileManager)
     {
         _rutas = rutasOptions.Value;
         _logger = logger;
         _barcodeRegionService = baco;
         _fileManager = fileManager;
-        _soporteApi = soporteApi;
+        _soporteProcesamiento = soporteProcesamiento;
         _directorioEntrada = _rutas.Procesar;
-        _soporteFisicoApi = soporteFisicoApi;
+        _directorioEntradaNormalizado = NormalizarDirectorio(_directorioEntrada);
+        _directorioProcesandoNormalizado = NormalizarDirectorio(_rutas.Procesando);
         _semaforo = new SemaphoreSlim(fileSettings.Value.MaxArchivosConcurrentes);
         _maxReintentos = fileSettings.Value.BarcodeMaxReintentos;
         _esperaMs = fileSettings.Value.BarcodeEsperaMs;
+        _archivoEsperaIntentos = Math.Max(1, fileSettings.Value.ArchivoEsperaIntentos);
+        _archivoEsperaMs = Math.Max(100, fileSettings.Value.ArchivoEsperaMs);
+        _archivoLecturasEstables = Math.Max(1, fileSettings.Value.ArchivoLecturasEstables);
         Directory.CreateDirectory(_directorioEntrada);
     }
+
+    private static string NormalizarDirectorio(string ruta) =>
+        Path.GetFullPath(ruta).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
     public void Iniciar(CancellationToken stoppingToken)
     {
@@ -65,66 +79,170 @@ public class FileWatcherInfraestructure
         _watcher = new FileSystemWatcher(_directorioEntrada)
         {
             Filter = "*.pdf",
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size,
             EnableRaisingEvents = true,
-            IncludeSubdirectories = false
+            IncludeSubdirectories = false,
+            InternalBufferSize = 65536
         };
 
-        _watcher.Created += (s, e) =>
+        _watcher.Created += (s, e) => EncolarArchivoDetectado(e.FullPath);
+        _watcher.Changed += (s, e) => EncolarArchivoDetectado(e.FullPath);
+        _watcher.Renamed += (s, e) => EncolarArchivoDetectado(e.FullPath);
+
+        _watcher.Error += (s, e) =>
         {
-            Task.Run(() => ProcesarArchivoAsync(e.FullPath));
+            _logger.LogError(
+                "FileSystemWatcherError | El buffer de eventos se desbordó; el escaneo periódico seguirá detectando archivos en Procesar.");
         };
 
-        // Changed se dispara cuando el handle de escritura se cierra (copia completa),
-        // lo que garantiza una segunda oportunidad para archivos grandes o lentos.
-        _watcher.Changed += (s, e) =>
+        _logger.LogInformation(
+            "Watcher iniciado en carpeta Procesar | Ruta={Ruta}",
+            _directorioEntradaNormalizado);
+
+        // Escaneo periódico: recupera archivos atascados o no detectados por el watcher
+        // (redes, antivirus, copias desde /error, buffer overflow del watcher)
+        _ = Task.Run(async () =>
         {
-            Task.Run(() => ProcesarArchivoAsync(e.FullPath));
-        };
+            await EscanearCarpetaEntradaAsync();
 
-        _logger.LogInformation("Watcher iniciado en carpeta Procesar");
+            while (!_stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), _stoppingToken);
+                    await EscanearCarpetaEntradaAsync();
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error en escaneo periódico de carpeta Procesar");
+                }
+            }
+        });
+    }
+
+    private void EncolarArchivoDetectado(string? ruta)
+    {
+        if (string.IsNullOrWhiteSpace(ruta))
+            return;
+
+        Task.Run(() => ProcesarArchivoAsync(ruta));
+    }
+
+    private async Task EscanearCarpetaEntradaAsync()
+    {
+        if (!Directory.Exists(_directorioEntrada))
+            return;
+
+        var archivos = Directory.GetFiles(_directorioEntrada, "*.pdf");
+        if (archivos.Length == 0)
+            return;
+
+        _logger.LogDebug(
+            "EscaneoProcesar | ArchivosEncontrados={Cantidad}",
+            archivos.Length);
+
+        foreach (var archivo in archivos)
+            _ = Task.Run(() => ProcesarArchivoAsync(archivo));
     }
 
     public void ProcesarPendientesAlIniciar(CancellationToken stoppingToken)
     {
         _stoppingToken = stoppingToken;
 
+        ProcesarPendientesEnCarpeta(
+            _rutas.Procesando,
+            yaEnProcesando: true,
+            etiqueta: "PROCESANDO");
+
+        ProcesarPendientesEnCarpeta(
+            _directorioEntrada,
+            yaEnProcesando: false,
+            etiqueta: "PROCESAR");
+    }
+
+    private void ProcesarPendientesEnCarpeta(string carpeta, bool yaEnProcesando, string etiqueta)
+    {
         try
         {
-            var archivos = Directory.GetFiles(_rutas.Procesando, "*.pdf");
+            if (!Directory.Exists(carpeta))
+                return;
+
+            var archivos = Directory.GetFiles(carpeta, "*.pdf");
 
             if (archivos.Length == 0)
             {
-                _logger.LogInformation("No hay archivos pendientes en PROCESANDO");
+                _logger.LogInformation("No hay archivos pendientes en {Carpeta}", etiqueta);
                 return;
             }
 
             _logger.LogWarning(
-                "RecuperacionArchivos | Cantidad={Cantidad}",
-                archivos.Length
-            );
+                "RecuperacionArchivos | Carpeta={Carpeta} | Cantidad={Cantidad}",
+                etiqueta,
+                archivos.Length);
 
             foreach (var archivo in archivos)
-            {
-                Task.Run(() => ProcesarArchivoAsync(archivo, yaEnProcesando: true));
-            }
+                Task.Run(() => ProcesarArchivoAsync(archivo, yaEnProcesando));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error recuperando archivos pendientes");
+            _logger.LogError(ex, "Error recuperando archivos pendientes en {Carpeta}", etiqueta);
         }
     }
 
     private async Task ProcesarArchivoAsync(string ruta, bool yaEnProcesando = false)
     {
-        await _semaforo.WaitAsync();
+        if (string.IsNullOrWhiteSpace(ruta) || !ruta.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            return;
 
-        var nombreArchivo = Path.GetFileName(ruta);
-
-        if (!MarcarComoProcesando(ruta))
+        try
         {
-            _semaforo.Release();
+            ruta = Path.GetFullPath(ruta);
+        }
+        catch
+        {
             return;
         }
+
+        if (!File.Exists(ruta))
+            return;
+
+        if (!EsRutaEnCarpetaEsperada(ruta, yaEnProcesando))
+        {
+            _logger.LogDebug(
+                "EventoIgnorado | Archivo={Archivo} | Motivo=FueraDeCarpetaEsperada | YaEnProcesando={YaEnProcesando}",
+                Path.GetFileName(ruta),
+                yaEnProcesando);
+            return;
+        }
+
+        var nombreArchivo = Path.GetFileName(ruta);
+        var turnoArchivo = ObtenerTurnoArchivo(ruta);
+        var enCola = turnoArchivo.CurrentCount == 0;
+
+        if (enCola)
+        {
+            _logger.LogInformation(
+                "ArchivoEnCola | Archivo={Archivo} | Motivo=Otro hilo está procesando la misma ruta; se esperará y se ejecutará igual",
+                nombreArchivo);
+        }
+
+        await turnoArchivo.WaitAsync(_stoppingToken);
+
+        // El archivo puede haber sido movido por una ejecución previa encolada
+        // para la misma ruta (evento duplicado Created/Changed/Renamed).
+        // En ese caso no es error: se descarta esta ejecución silenciosamente.
+        if (!File.Exists(ruta))
+        {
+            _logger.LogInformation(
+                "ArchivoYaMovido | Archivo={Archivo} | Ruta={Ruta} | Nota=Evento duplicado; ya fue atendido por una ejecución previa",
+                nombreArchivo,
+                ruta);
+            turnoArchivo.Release();
+            return;
+        }
+
+        await _semaforo.WaitAsync(_stoppingToken);
 
         string rutaProcesando = null;
 
@@ -133,7 +251,7 @@ public class FileWatcherInfraestructure
         try
         {
             _logger.LogInformation(
-                "ArchivoDetectado | Archivo={Archivo} | Ruta={Ruta}",
+                "ProcesamientoIniciado | Archivo={Archivo} | Ruta={Ruta} | Nota=No se valida historial previo; cada archivo en Procesar se ejecuta",
                 nombreArchivo,
                 ruta
             );
@@ -143,49 +261,30 @@ public class FileWatcherInfraestructure
             // mover a procesando (si ya viene de esa carpeta, no mover)
             rutaProcesando = yaEnProcesando ? ruta : _fileManager.MoverAProcesando(ruta);
 
+            // esperar que el archivo esté disponible en Procesando (el antivirus puede rescanearlo)
+            await EsperarArchivoDisponible(rutaProcesando);
+
             var documento = await ProcesarConReintentos(rutaProcesando, nombreArchivo);
 
             if (documento != null)
             {
                 var soporte = $"{documento.Prefijo}{documento.Numero}";
 
-                // 🔥 API 1
-                var respuesta = await _soporteApi.EnviarSoporteAsync(soporte);
+                var resultado = await _soporteProcesamiento.ProcesarAsync(soporte, rutaProcesando);
 
-                if (respuesta == null)
+                if (!resultado.EsExitoso)
                 {
                     _logger.LogError(
-                        "FalloApiDatos | Archivo={Archivo} | Soporte={Soporte}",
+                        "FalloIntegracionSoporte | Archivo={Archivo} | Soporte={Soporte} | Estado={Estado}",
                         nombreArchivo,
-                        soporte
-                    );
+                        soporte,
+                        resultado.Estado);
 
                     _fileManager.MoverAError(rutaProcesando);
                     ActualizarContadores(ok: false);
                     return;
                 }
 
-                // 🔥 API 2
-                var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-                    soporte,
-                    rutaProcesando,
-                    respuesta
-                );
-
-                if (!enviadoFisico)
-                {
-                    _logger.LogError(
-                        "FalloApiFisico | Archivo={Archivo} | Soporte={Soporte}",
-                        nombreArchivo,
-                        soporte
-                    );
-
-                    _fileManager.MoverAError(rutaProcesando);
-                    ActualizarContadores(ok: false);
-                    return;
-                }
-
-                // 🔥 SOLO SI TODO OK
                 _fileManager.MoverAProcesados(rutaProcesando, documento.NombreArchivo);
 
                 ActualizarContadores(ok: true);
@@ -210,8 +309,7 @@ public class FileWatcherInfraestructure
                 "ErrorProcesandoArchivo | Archivo={Archivo} | Ruta={Ruta} | Mensaje={Mensaje}",
                 nombreArchivo,
                 rutaProcesando ?? ruta,
-                ex.Message
-            );
+                ex.Message);
 
             try
             {
@@ -231,11 +329,6 @@ public class FileWatcherInfraestructure
         {
             stopwatch.Stop();
 
-            lock (_procesando)
-            {
-                _procesando.Remove(ruta);
-            }
-
             lock (_lockStats)
             {
                 _tiempoTotalProcesamientoMs += stopwatch.ElapsedMilliseconds;
@@ -243,8 +336,12 @@ public class FileWatcherInfraestructure
             }
 
             _semaforo.Release();
+            turnoArchivo.Release();
         }
     }
+
+    private SemaphoreSlim ObtenerTurnoArchivo(string ruta) =>
+        _turnosPorArchivo.GetOrAdd(ruta, _ => new SemaphoreSlim(1, 1));
 
     private void ActualizarContadores(bool ok)
     {
@@ -282,43 +379,76 @@ public class FileWatcherInfraestructure
 
     private async Task EsperarArchivoDisponible(string ruta)
     {
-        int intentos = 30;
+        long ultimaLongitud = -1;
+        int lecturasEstables = 0;
+        Exception? ultimoError = null;
 
-        for (int i = 0; i < intentos; i++)
+        for (int i = 0; i < _archivoEsperaIntentos; i++)
         {
             _stoppingToken.ThrowIfCancellationRequested();
 
             try
             {
-                using (FileStream stream = File.Open(ruta, FileMode.Open, FileAccess.Read, FileShare.Read))
+                if (!File.Exists(ruta))
                 {
-                    return;
+                    ultimoError = new FileNotFoundException("El archivo no existe en disco.", ruta);
+                    lecturasEstables = 0;
+                    ultimaLongitud = -1;
+                }
+                else
+                {
+                    using var stream = AbrirArchivoParaLectura(ruta);
+                    var longitud = stream.Length;
+
+                    if (longitud <= 0)
+                    {
+                        ultimoError = new InvalidDataException("El archivo tiene tamaño cero.");
+                        lecturasEstables = 0;
+                        ultimaLongitud = -1;
+                    }
+                    else if (longitud == ultimaLongitud)
+                    {
+                        lecturasEstables++;
+                        if (lecturasEstables >= _archivoLecturasEstables)
+                        {
+                            _logger.LogDebug(
+                                "ArchivoDisponible | Archivo={Archivo} | Tamano={Tamano} | Intento={Intento}",
+                                Path.GetFileName(ruta),
+                                longitud,
+                                i + 1);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        ultimaLongitud = longitud;
+                        lecturasEstables = 1;
+                        ultimoError = null;
+                    }
                 }
             }
             catch (OperationCanceledException)
             {
                 throw;
             }
-            catch
+            catch (Exception ex)
             {
-                await Task.Delay(500, _stoppingToken);
+                ultimoError = ex;
+                lecturasEstables = 0;
+                ultimaLongitud = -1;
             }
+
+            await Task.Delay(_archivoEsperaMs, _stoppingToken);
         }
 
-        throw new Exception("El archivo no está disponible");
+        var detalle = ultimoError?.Message ?? "tiempo de espera agotado";
+        throw new IOException(
+            $"El archivo no está disponible tras {_archivoEsperaIntentos} intentos: {detalle}",
+            ultimoError);
     }
 
-    private bool MarcarComoProcesando(string ruta)
-    {
-        lock (_procesando)
-        {
-            if (_procesando.Contains(ruta))
-                return false;
-
-            _procesando.Add(ruta);
-            return true;
-        }
-    }
+    private static FileStream AbrirArchivoParaLectura(string ruta) =>
+        new(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
     private async Task<DocumentoProcesadoDto?> ProcesarConReintentos(string ruta, string nombreArchivo)
     {
@@ -365,5 +495,15 @@ public class FileWatcherInfraestructure
         }
 
         return null;
+    }
+
+    private bool EsRutaEnCarpetaEsperada(string rutaCompleta, bool yaEnProcesando)
+    {
+        var directorio = NormalizarDirectorio(Path.GetDirectoryName(rutaCompleta)!);
+        var esperado = yaEnProcesando
+            ? _directorioProcesandoNormalizado
+            : _directorioEntradaNormalizado;
+
+        return string.Equals(directorio, esperado, StringComparison.OrdinalIgnoreCase);
     }
 }

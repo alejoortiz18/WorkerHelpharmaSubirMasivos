@@ -1,0 +1,196 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Manual de Usuario - Worker Masivos Helpharma</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.35; margin: 24px; }
+    h1, h2, h3 { color: #1f4e78; }
+    h1 { font-size: 22pt; margin-bottom: 6px; }
+    h2 { font-size: 15pt; margin-top: 24px; }
+    h3 { font-size: 12pt; margin-top: 18px; }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0 16px 0; }
+    th, td { border: 1px solid #cfd8dc; padding: 6px; text-align: left; vertical-align: top; }
+    th { background: #f4f8fb; }
+    .small { font-size: 10pt; color: #37474f; }
+    .box { border: 1px solid #b0bec5; padding: 10px; background: #fafcfe; margin: 10px 0; }
+    .warning { border-left: 4px solid #e53935; padding: 10px; background: #fff5f5; }
+    .ok { border-left: 4px solid #43a047; padding: 10px; background: #f6fff8; }
+    .code { font-family: Consolas, monospace; background: #f1f4f8; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Manual de Usuario</h1>
+  <div><b>Worker Masivos Helpharma</b></div>
+  <div class="small">Versión del manual: 1.0 | Fecha: 2026-05-26</div>
+
+  <h2>1. Objetivo del sistema</h2>
+  <p>
+    Este worker automatiza el procesamiento de soportes físicos en PDF. Su función es detectar archivos
+    en la carpeta de entrada, extraer el código de barras, consultar datos del soporte y cargar el soporte
+    físico a la API correspondiente. Dependiendo del resultado, el archivo se mueve automáticamente a
+    <span class="code">Procesados</span> o <span class="code">error</span>.
+  </p>
+
+  <h2>2. Flujo funcional</h2>
+  <ol>
+    <li>El usuario deposita un PDF en <span class="code">C:\Masivos\procesar</span>.</li>
+    <li>El worker detecta el archivo (watcher + escaneo periódico).</li>
+    <li>Mueve el archivo a <span class="code">C:\Masivos\Procesando</span>.</li>
+    <li>Lee código de barras (con reintentos configurables).</li>
+    <li>Consulta API de datos del soporte.</li>
+    <li>Envía API de soporte físico con adjunto PDF.</li>
+    <li>Si todo sale bien, mueve a <span class="code">C:\Masivos\Procesados</span>.</li>
+    <li>Si falla cualquier paso, mueve a <span class="code">C:\Masivos\error</span>.</li>
+  </ol>
+
+  <div class="box">
+    <b>Pantallazo sugerido 1:</b> Diagrama de flujo general del proceso.<br/>
+    <span class="small">Insertar aquí captura de: PlanesEjecucion/diagrama-flujo-worker-masivos.html</span>
+  </div>
+
+  <h2>3. Estructura de carpetas operativas</h2>
+  <table>
+    <tr><th>Carpeta</th><th>Función</th><th>Uso del usuario</th></tr>
+    <tr><td><span class="code">C:\Masivos\procesar</span></td><td>Entrada de documentos PDF</td><td>Aquí se copian o pegan los nuevos archivos.</td></tr>
+    <tr><td><span class="code">C:\Masivos\Procesando</span></td><td>Proceso en curso</td><td>No mover ni editar archivos en esta carpeta.</td></tr>
+    <tr><td><span class="code">C:\Masivos\Procesados</span></td><td>Éxito</td><td>Repositorio de archivos cargados correctamente.</td></tr>
+    <tr><td><span class="code">C:\Masivos\error</span></td><td>Fallo de procesamiento</td><td>Revisar causa y reintentar manualmente.</td></tr>
+  </table>
+
+  <div class="box">
+    <b>Pantallazo sugerido 2:</b> Explorador de Windows mostrando las 4 carpetas.<br/>
+    <span class="small">Insertar captura real de C:\Masivos</span>
+  </div>
+
+  <h2>4. Reglas de nombramiento de archivos</h2>
+  <ul>
+    <li>Prefijo estándar: <span class="code">CRC_900277244_</span>.</li>
+    <li>El worker normaliza nombres para evitar duplicidad de prefijo.</li>
+    <li>Si llega un archivo como <span class="code">CRC_900277244_CRC_900277244_26052026_0048.pdf</span>, se corrige a <span class="code">CRC_900277244_26052026_0048.pdf</span>.</li>
+  </ul>
+
+  <h2>5. Procedimiento operativo diario</h2>
+  <h3>5.1 Carga de nuevos documentos</h3>
+  <ol>
+    <li>Verificar que el servicio <b>MasivosWorker</b> esté iniciado.</li>
+    <li>Copiar los PDFs a <span class="code">C:\Masivos\procesar</span>.</li>
+    <li>Esperar a que los archivos salgan de la carpeta.</li>
+    <li>Confirmar en <span class="code">Procesados</span> o <span class="code">error</span>.</li>
+  </ol>
+
+  <h3>5.2 Reintento de archivos en error</h3>
+  <ol>
+    <li>Tomar el archivo desde <span class="code">C:\Masivos\error</span>.</li>
+    <li>Pegarlo nuevamente en <span class="code">C:\Masivos\procesar</span>.</li>
+    <li>El worker debe reprocesarlo sin validar histórico previo.</li>
+  </ol>
+
+  <div class="ok">
+    <b>Comportamiento esperado:</b> todo archivo que llegue a <span class="code">procesar</span> debe ejecutar el flujo completo (detección, APIs, salida final).
+  </div>
+
+  <h2>6. Verificación del servicio de Windows</h2>
+  <ol>
+    <li>Abrir <b>Servicios</b> (services.msc).</li>
+    <li>Buscar <b>MasivosWorker</b>.</li>
+    <li>Estado esperado: <b>En ejecución</b>.</li>
+    <li>Tipo de inicio recomendado: <b>Automático</b>.</li>
+  </ol>
+
+  <div class="box">
+    <b>Pantallazo sugerido 3:</b> Consola de servicios mostrando MasivosWorker en ejecución.
+  </div>
+
+  <h2>7. Monitoreo en Visor de eventos</h2>
+  <p>Ruta recomendada: <b>Visor de eventos &gt; Windows Logs &gt; Application</b>, filtrando por origen <b>MasivosWorker</b>.</p>
+  <table>
+    <tr><th>Evento / Mensaje</th><th>Interpretación</th><th>Acción</th></tr>
+    <tr><td><span class="code">ProcesamientoIniciado</span></td><td>Archivo entró al flujo</td><td>Ninguna</td></tr>
+    <tr><td><span class="code">ApiSoporteOK</span></td><td>API de datos respondió correctamente</td><td>Ninguna</td></tr>
+    <tr><td><span class="code">SoporteFisicoOK</span></td><td>Carga física exitosa</td><td>Ninguna</td></tr>
+    <tr><td><span class="code">Archivo movido a PROCESADOS</span></td><td>Finalización correcta</td><td>Ninguna</td></tr>
+    <tr><td><span class="code">FalloApiDatos</span></td><td>Error API datos soporte</td><td>Validar API key / endpoint / datos</td></tr>
+    <tr><td><span class="code">FalloApiFisico</span></td><td>Error API soporte físico</td><td>Validar token / endpoint / disponibilidad</td></tr>
+    <tr><td><span class="code">ArchivoSinCodigo</span></td><td>No se detectó código de barras</td><td>Validar calidad del PDF</td></tr>
+    <tr><td><span class="code">ArchivoYaMovido</span></td><td>Evento duplicado ya atendido</td><td>No es error</td></tr>
+  </table>
+
+  <div class="box">
+    <b>Pantallazo sugerido 4:</b> Visor de eventos con eventos exitosos y fallidos del worker.
+  </div>
+
+  <h2>8. Configuración del sistema (appsettings.json)</h2>
+  <p>Archivo: <span class="code">MasivosWorker\MasivosWorker\appsettings.json</span></p>
+  <table>
+    <tr><th>Sección</th><th>Clave</th><th>Descripción</th></tr>
+    <tr><td>Rutas</td><td>Procesar, Procesando, Procesados, Error</td><td>Carpetas operativas del flujo.</td></tr>
+    <tr><td>FileSettings</td><td>KeyName</td><td>Prefijo institucional del archivo.</td></tr>
+    <tr><td>FileSettings</td><td>MaxArchivosConcurrentes</td><td>Límite de procesamiento concurrente.</td></tr>
+    <tr><td>FileSettings</td><td>BarcodeMaxReintentos / BarcodeEsperaMs</td><td>Reintentos de lectura de código.</td></tr>
+    <tr><td>FileSettings</td><td>ArchivoEsperaIntentos / ArchivoEsperaMs / ArchivoLecturasEstables</td><td>Control de espera para archivo disponible.</td></tr>
+    <tr><td>ApiCredentials</td><td>SoporteApiKey / SoporteFisicoToken / IdUsuario</td><td>Credenciales API.</td></tr>
+    <tr><td>IronBarcode</td><td>LicenseKey</td><td>Licencia del motor de barcode.</td></tr>
+  </table>
+
+  <div class="warning">
+    <b>Importante:</b> No compartir ni exponer credenciales (API keys, token, licencia).<br/>
+    En producción, mantener permisos restringidos sobre este archivo.
+  </div>
+
+  <div class="box">
+    <b>Pantallazo sugerido 5:</b> appsettings.json resaltando Rutas y FileSettings.
+  </div>
+
+  <h2>9. Solución de problemas (Troubleshooting)</h2>
+  <h3>9.1 El archivo se queda en procesar</h3>
+  <ul>
+    <li>Verificar si el servicio está en ejecución.</li>
+    <li>Validar que la extensión sea <span class="code">.pdf</span>.</li>
+    <li>Revisar permisos de la cuenta del servicio sobre <span class="code">C:\Masivos</span>.</li>
+    <li>Comprobar bloqueo por antivirus o proceso externo.</li>
+  </ul>
+
+  <h3>9.2 Sale nuevamente en error</h3>
+  <ul>
+    <li>Revisar evento específico: <span class="code">FalloApiDatos</span>, <span class="code">FalloApiFisico</span>, <span class="code">ArchivoSinCodigo</span>.</li>
+    <li>Confirmar disponibilidad de APIs.</li>
+    <li>Validar legibilidad y calidad del PDF.</li>
+  </ul>
+
+  <h3>9.3 Prefijo duplicado en nombre</h3>
+  <ul>
+    <li>La versión actual normaliza automáticamente el prefijo al mover archivos.</li>
+    <li>Si existen históricos con varios prefijos, reingresarlos por <span class="code">procesar</span> para corregir nombre en el flujo.</li>
+  </ul>
+
+  <h2>10. Procedimiento de publicación de nueva versión</h2>
+  <ol>
+    <li>Tomar build publicada desde:<br/><span class="code">C:\Users\alejandro.ortiz\Documents\helpharma\Desarrollos\publicaciones\worker masivo</span></li>
+    <li>Detener servicio <b>MasivosWorker</b>.</li>
+    <li>Reemplazar binarios en servidor.</li>
+    <li>Verificar <span class="code">appsettings.json</span> de producción.</li>
+    <li>Iniciar servicio.</li>
+    <li>Ejecutar prueba de humo con 1 PDF de prueba.</li>
+  </ol>
+
+  <h2>11. Checklist de operación</h2>
+  <table>
+    <tr><th>Ítem</th><th>Estado</th><th>Observación</th></tr>
+    <tr><td>Servicio MasivosWorker en ejecución</td><td>[ ]</td><td></td></tr>
+    <tr><td>Carpetas C:\Masivos accesibles</td><td>[ ]</td><td></td></tr>
+    <tr><td>Procesamiento de archivo de prueba OK</td><td>[ ]</td><td></td></tr>
+    <tr><td>Eventos de error revisados diariamente</td><td>[ ]</td><td></td></tr>
+    <tr><td>Respaldo de archivos procesados</td><td>[ ]</td><td></td></tr>
+  </table>
+
+  <h2>12. Control documental</h2>
+  <table>
+    <tr><th>Versión</th><th>Fecha</th><th>Autor</th><th>Cambios</th></tr>
+    <tr><td>1.0</td><td>2026-05-26</td><td>Equipo Soportes Masivos</td><td>Versión inicial del manual de usuario.</td></tr>
+  </table>
+
+  <p class="small">
+    Fin del documento.
+  </p>
+</body>
+</html>

@@ -66,22 +66,22 @@ namespace Infrastructure
             _logger.LogInformation($"Acceso directo creado: {rutaAcceso}");
         }
 
-        // 🔥 NUEVO MÉTODO CLAVE
         public string MoverAProcesando(string rutaOrigen)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-            var destino = Path.Combine(_rutas.Procesando, $"{_fileName}{nombre}");
+            var nombreFinal = NormalizarNombreConPrefijo(nombre);
+            var destino = Path.Combine(_rutas.Procesando, nombreFinal);
 
             File.Move(rutaOrigen, destino, true);
 
-            _logger.LogInformation($"Archivo movido a PROCESANDO: {nombre}");
+            _logger.LogInformation($"Archivo movido a PROCESANDO: {nombreFinal}");
 
             return destino;
         }
 
         public void MoverAProcesados(string rutaOrigen, string nuevoNombre)
         {
-            var destino = Path.Combine(_rutas.Procesados, $"{_fileName}{nuevoNombre}");
+            var destino = Path.Combine(_rutas.Procesados, NormalizarNombreConPrefijo(nuevoNombre));
 
             File.Move(rutaOrigen, destino, true);
 
@@ -91,25 +91,45 @@ namespace Infrastructure
         public void MoverAError(string rutaOrigen)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-            var destino = Path.Combine(_rutas.Error, $"{nombre}");
+            var nombreFinal = NormalizarNombreConPrefijo(nombre);
+            var destino = Path.Combine(_rutas.Error, nombreFinal);
 
             File.Move(rutaOrigen, destino, true);
 
-            _logger.LogWarning($"Archivo movido a ERROR: {nombre}");
+            _logger.LogWarning($"Archivo movido a ERROR: {nombreFinal}");
         }
 
-        // Aplica prefijo aunque el archivo venga de /procesar (sin prefijo aún)
         public void MoverAErrorDesdeOrigen(string rutaOrigen)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-
-            // Si ya tiene el prefijo (viene de /Procesando), no lo duplica
-            var nombreFinal = nombre.StartsWith(_fileName) ? nombre : $"{_fileName}{nombre}";
+            var nombreFinal = NormalizarNombreConPrefijo(nombre);
             var destino = Path.Combine(_rutas.Error, nombreFinal);
 
             File.Move(rutaOrigen, destino, true);
 
             _logger.LogWarning($"Archivo movido a ERROR (desde origen): {nombreFinal}");
         }
+
+        /// <summary>
+        /// Quita prefijos repetidos al inicio y deja exactamente uno (p. ej. tras reintentos desde /error).
+        /// </summary>
+        public static string NormalizarNombreConPrefijo(string nombreArchivo, string prefijo)
+        {
+            if (string.IsNullOrEmpty(prefijo))
+                return nombreArchivo;
+
+            var nombre = nombreArchivo;
+            while (nombre.StartsWith(prefijo, StringComparison.OrdinalIgnoreCase))
+                nombre = nombre[prefijo.Length..];
+
+            return $"{prefijo}{nombre}";
+        }
+
+        /// <inheritdoc cref="NormalizarNombreConPrefijo(string, string)"/>
+        public static string AplicarPrefijoSiFalta(string nombreArchivo, string prefijo) =>
+            NormalizarNombreConPrefijo(nombreArchivo, prefijo);
+
+        private string NormalizarNombreConPrefijo(string nombreArchivo) =>
+            NormalizarNombreConPrefijo(nombreArchivo, _fileName);
     }
 }

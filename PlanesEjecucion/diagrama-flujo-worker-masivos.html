@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Worker Masivos Helpharma — Diagrama de Flujo</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #63b3ed;
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: #718096;
+    }
+
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 40px;
+      max-width: 960px;
+      width: 100%;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    footer {
+      margin-top: 32px;
+      font-size: 0.78rem;
+      color: #4a5568;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Worker Masivos Helpharma</h1>
+    <p>Flujo completo de procesamiento y carga de soportes físicos</p>
+  </header>
+
+  <div class="card">
+    <div class="mermaid">
+flowchart TD
+    A([🚀 Worker Inicia]) --> B[Crear carpetas si no existen\nCrear accesos directos]
+    B --> C[Recuperar PDFs pendientes\nen carpeta PROCESANDO]
+    C --> D[Iniciar FileSystemWatcher\ncarpeta PROCESAR *.pdf]
+    D --> E[Escaneo periódico cada 30 s\npara archivos atascados]
+
+    E -.->|archivo detectado| F
+    D -->|evento Created / Changed| F
+
+    F[PDF detectado en PROCESAR] --> G{¿Ya se está\nprocesando?}
+    G -- Sí --> Z1([Ignorar duplicado])
+    G -- No --> K[BarcodeRegionService\nLeer código de barras del PDF\ncon reintentos]
+
+    K --> L{¿Código de barras\nencontrado?}
+    L -- No --> ERR1[Mover a carpeta ERROR\nLog warning]
+
+    L -- Sí --> M[Construir Nro. Soporte\nPrefijo + Número]
+
+    M --> N["🌐 API 1 — Datos del Soporte\napi-soportes.helpharma.com.co\nPOST DatosSoportes"]
+
+    N --> O{¿Respuesta OK?}
+    O -- No --> ERR2[Mover a carpeta ERROR\nLog error]
+
+    O -- Sí --> P["Datos recibidos:\nPaciente · Convenio · Sede\nMedicamentos · Fechas · Valores"]
+
+    P --> Q["🌐 API 2 — Subir Soporte Físico\nintranet.helpharma.com\nPOST /api/v1/soporte/fisico\nMultipart: datos + PDF"]
+
+    Q --> R{¿Upload OK?}
+    R -- No --> ERR3[Mover a carpeta ERROR\nLog error]
+
+    R -- Sí --> S[Mover a carpeta PROCESADOS\nNombre final del archivo]
+
+    S --> T1["✅ Intranet Helpharma\nSesión: Consulta de Soportes\nSoporte físico disponible\ncon todos sus datos"]
+    S --> T2["🔗 Software de Radicación\nSoporte enlazado\na la Factura correspondiente"]
+
+    ERR1 & ERR2 & ERR3 --> FIN_ERR([Actualizar contadores])
+    S --> FIN_OK([Actualizar contadores])
+
+    style T1 fill:#1a7a4a,color:#fff,stroke:#0d5c35
+    style T2 fill:#1a4a7a,color:#fff,stroke:#0d355c
+    style ERR1 fill:#8b0000,color:#fff,stroke:#5c0000
+    style ERR2 fill:#8b0000,color:#fff,stroke:#5c0000
+    style ERR3 fill:#8b0000,color:#fff,stroke:#5c0000
+    style A fill:#2d5a27,color:#fff
+    style N fill:#4a4a8b,color:#fff
+    style Q fill:#4a4a8b,color:#fff
+    </div>
+  </div>
+
+  <footer>
+    Helpharma &nbsp;·&nbsp; Generado el 06/05/2026
+  </footer>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      flowchart: { curve: 'basis', padding: 20 }
+    });
+  </script>
+
+</body>
+</html>

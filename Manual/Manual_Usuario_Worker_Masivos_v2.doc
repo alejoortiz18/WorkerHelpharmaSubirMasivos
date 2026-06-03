@@ -1,0 +1,187 @@
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Manual de Usuario - Worker Masivos Helpharma</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.45; margin: 24px; color: #1a1a1a; }
+    h1, h2, h3 { color: #1f4e78; }
+    h1 { font-size: 22pt; margin-bottom: 4px; }
+    h2 { font-size: 15pt; margin-top: 24px; }
+    h3 { font-size: 12pt; margin-top: 18px; }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0 16px 0; }
+    th, td { border: 1px solid #cfd8dc; padding: 7px; text-align: left; vertical-align: top; }
+    th { background: #f4f8fb; }
+    .small { font-size: 10pt; color: #455a64; }
+    .box { border: 1px solid #b0bec5; padding: 10px; background: #fafcfe; margin: 10px 0; }
+    .warning { border-left: 4px solid #e53935; padding: 10px; background: #fff5f5; }
+    .ok { border-left: 4px solid #43a047; padding: 10px; background: #f6fff8; }
+    .code { font-family: Consolas, monospace; background: #f1f4f8; padding: 2px 4px; }
+    .step { background: #f8fbff; border: 1px solid #d7e6f3; padding: 10px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Manual de Usuario</h1>
+  <div><b>Worker Masivos Helpharma</b></div>
+  <div class="small">Versión del manual: 2.0 | Fecha: 2026-05-27</div>
+
+  <h2>1. ¿Para qué sirve este sistema?</h2>
+  <p>
+    Este sistema recibe documentos escaneados en PDF y los procesa automáticamente.
+    El objetivo es que el usuario solo deposite documentos en una carpeta y pueda revisar
+    fácilmente cuáles quedaron bien y cuáles quedaron con error.
+  </p>
+
+  <div class="ok">
+    <b>Idea clave:</b> el usuario no necesita conocimientos técnicos. Solo debe mover archivos entre carpetas
+    cuando sea necesario.
+  </div>
+
+  <h2>2. Flujo real del área operativa</h2>
+  <ol>
+    <li>El escáner envía los documentos directamente a <span class="code">C:\Masivos\procesar</span>.</li>
+    <li>El usuario abre la carpeta <b>procesar</b> y verifica que la cantidad de archivos vaya bajando.</li>
+    <li>El usuario abre <b>error</b> y <b>Procesados</b> para validar resultados.</li>
+    <li>Cuando termina una pasada, toma los archivos de <b>error</b>, hace <b>Cortar</b> y luego <b>Pegar</b> en <b>procesar</b>.</li>
+    <li>Puede repetir esta segunda (o tercera) pasada varias veces.</li>
+    <li>Si después de varias pasadas siguen en error, esos documentos se cargan manualmente en el sistema.</li>
+  </ol>
+
+  <div class="box">
+    <b>Pantallazo 1 sugerido:</b> Explorador de Windows abierto en <span class="code">C:\Masivos</span> mostrando las carpetas:
+    <span class="code">procesar</span>, <span class="code">Procesando</span>, <span class="code">Procesados</span>, <span class="code">error</span>.
+  </div>
+
+  <h2>3. Carpetas que usa el usuario</h2>
+  <table>
+    <tr><th>Carpeta</th><th>¿Qué significa?</th><th>¿Qué debe hacer el usuario?</th></tr>
+    <tr>
+      <td><span class="code">C:\Masivos\procesar</span></td>
+      <td>Entrada de documentos</td>
+      <td>Aquí llegan los PDFs del escáner. También aquí se pegan los archivos de <b>error</b> para reintento.</td>
+    </tr>
+    <tr>
+      <td><span class="code">C:\Masivos\Procesando</span></td>
+      <td>Archivos en proceso</td>
+      <td>No mover ni modificar archivos aquí.</td>
+    </tr>
+    <tr>
+      <td><span class="code">C:\Masivos\Procesados</span></td>
+      <td>Resultado exitoso</td>
+      <td>Revisar que los documentos llegaron correctamente.</td>
+    </tr>
+    <tr>
+      <td><span class="code">C:\Masivos\error</span></td>
+      <td>Procesamiento fallido</td>
+      <td>Tomar archivos para una nueva pasada o para carga manual.</td>
+    </tr>
+  </table>
+
+  <h2>4. Guía paso a paso (explicada muy despacio)</h2>
+
+  <h3>Paso 1 - Abrir la carpeta de trabajo</h3>
+  <div class="step">
+    1) Presione la tecla de Windows.<br/>
+    2) Escriba: <span class="code">C:\Masivos</span><br/>
+    3) Presione Enter.<br/>
+    4) Se abrirá el Explorador con las carpetas del proceso.
+  </div>
+  <div class="box"><b>Pantallazo 2 sugerido:</b> ventana de Explorador abierta en <span class="code">C:\Masivos</span>.</div>
+
+  <h3>Paso 2 - Verificar que el sistema sí está procesando</h3>
+  <div class="step">
+    1) Abra la carpeta <b>procesar</b>.<br/>
+    2) Mire en la parte inferior de la ventana (barra de estado).<br/>
+    3) Observe el número de archivos.<br/>
+    4) Si el número va bajando con el tiempo, el worker está funcionando.
+  </div>
+  <div class="box"><b>Pantallazo 3 sugerido:</b> carpeta <b>procesar</b> con la barra inferior mostrando cantidad de archivos.</div>
+
+  <h3>Paso 3 - Revisar resultados de la primera pasada</h3>
+  <div class="step">
+    1) Abra <b>Procesados</b> y verifique cuántos quedaron bien.<br/>
+    2) Abra <b>error</b> y verifique cuántos fallaron.<br/>
+    3) Si <b>procesar</b> ya quedó vacía, la pasada terminó.
+  </div>
+  <div class="box"><b>Pantallazo 4 sugerido:</b> carpeta <b>Procesados</b> con archivos visibles.</div>
+  <div class="box"><b>Pantallazo 5 sugerido:</b> carpeta <b>error</b> con archivos visibles.</div>
+
+  <h3>Paso 4 - Reintentar archivos que quedaron en error</h3>
+  <div class="step">
+    1) Entre a <b>error</b>.<br/>
+    2) Seleccione los archivos que desea reintentar.<br/>
+    3) Presione <b>Ctrl + X</b> (Cortar).<br/>
+    4) Entre a <b>procesar</b>.<br/>
+    5) Presione <b>Ctrl + V</b> (Pegar).<br/>
+    6) Espere y valide de nuevo en <b>Procesados</b> y <b>error</b>.
+  </div>
+  <div class="box"><b>Pantallazo 6 sugerido:</b> acción de cortar en carpeta <b>error</b>.</div>
+  <div class="box"><b>Pantallazo 7 sugerido:</b> acción de pegar en carpeta <b>procesar</b>.</div>
+
+  <h3>Paso 5 - Repetir varias pasadas si se necesita</h3>
+  <div class="step">
+    Puede repetir el paso anterior varias veces.<br/>
+    Si después de varias pasadas un archivo sigue en <b>error</b>, se debe cargar manualmente en el sistema.
+  </div>
+
+  <h2>5. ¿Cómo saber si todo va bien?</h2>
+  <table>
+    <tr><th>Señal visual</th><th>Qué significa</th></tr>
+    <tr><td>La cantidad de archivos en <b>procesar</b> baja</td><td>El worker está atendiendo archivos.</td></tr>
+    <tr><td>Suben archivos en <b>Procesados</b></td><td>Resultado correcto.</td></tr>
+    <tr><td>Suben archivos en <b>error</b></td><td>Algunos documentos fallaron y requieren reintento o revisión.</td></tr>
+  </table>
+
+  <h2>6. Mensajes importantes en Visor de eventos</h2>
+  <p>Ruta: <b>Visor de eventos &gt; Registros de Windows &gt; Aplicación</b> (origen: <b>MasivosWorker</b>).</p>
+  <table>
+    <tr><th>Mensaje</th><th>Interpretación</th></tr>
+    <tr><td><span class="code">ProcesamientoIniciado</span></td><td>El archivo inició flujo.</td></tr>
+    <tr><td><span class="code">ApiSoporteOK</span></td><td>Consulta de datos exitosa.</td></tr>
+    <tr><td><span class="code">SoporteFisicoOK</span></td><td>Carga física exitosa.</td></tr>
+    <tr><td><span class="code">Archivo movido a PROCESADOS</span></td><td>Finalizó correctamente.</td></tr>
+    <tr><td><span class="code">Archivo movido a ERROR</span></td><td>Falló y fue separado para revisión/reintento.</td></tr>
+    <tr><td><span class="code">ArchivoYaMovido</span></td><td>Evento duplicado del sistema; no es una falla funcional.</td></tr>
+  </table>
+  <div class="box"><b>Pantallazo 8 sugerido:</b> visor de eventos mostrando eventos del worker.</div>
+
+  <h2>7. Preguntas frecuentes (FAQ)</h2>
+  <h3>7.1 ¿Qué hago si no baja la cantidad de archivos en procesar?</h3>
+  <ul>
+    <li>Verifique que el servicio <b>MasivosWorker</b> esté iniciado.</li>
+    <li>Revise si los archivos son PDF válidos.</li>
+    <li>Revise en Visor de eventos si hay errores de API o lectura de código.</li>
+  </ul>
+
+  <h3>7.2 ¿Puedo reenviar muchas veces un archivo de error a procesar?</h3>
+  <p>Sí. El flujo operativo permite reenviar archivos varias veces para intentar recuperación automática.</p>
+
+  <h3>7.3 ¿Qué hago con archivos que nunca salen de error?</h3>
+  <p>Después de varias pasadas, esos archivos deben subirse manualmente al sistema.</p>
+
+  <h2>8. Recomendaciones para el usuario operativo</h2>
+  <ul>
+    <li>No renombrar manualmente archivos en <b>Procesando</b>.</li>
+    <li>No borrar carpetas del flujo.</li>
+    <li>Siempre esperar a que <b>procesar</b> termine antes de evaluar resultados finales.</li>
+    <li>Hacer reintentos por bloques (no uno por uno) para ahorrar tiempo.</li>
+  </ul>
+
+  <h2>9. Lista de chequeo diaria</h2>
+  <table>
+    <tr><th>Ítem</th><th>OK</th><th>Observación</th></tr>
+    <tr><td>Servicio MasivosWorker en ejecución</td><td>[ ]</td><td></td></tr>
+    <tr><td>Escáner enviando a <span class="code">C:\Masivos\procesar</span></td><td>[ ]</td><td></td></tr>
+    <tr><td>Cantidad de archivos en procesar disminuye</td><td>[ ]</td><td></td></tr>
+    <tr><td>Revisión de carpetas Procesados y error realizada</td><td>[ ]</td><td></td></tr>
+    <tr><td>Reintento de archivos en error ejecutado</td><td>[ ]</td><td></td></tr>
+  </table>
+
+  <h2>10. Control de versiones del manual</h2>
+  <table>
+    <tr><th>Versión</th><th>Fecha</th><th>Cambio</th></tr>
+    <tr><td>2.0</td><td>2026-05-27</td><td>Manual completo con flujo real operativo y explicación detallada para usuario no técnico.</td></tr>
+  </table>
+
+  <p class="small">Fin del manual.</p>
+</body>
+</html>
