@@ -13,6 +13,8 @@ public class RedDisponibleService
     private readonly ILogger<RedDisponibleService> _logger;
     private bool _conexionEstablecida;
 
+    public string? UltimoErrorMensaje { get; private set; }
+
     public RedDisponibleService(
         IOptions<RutasSettings> rutasOptions,
         IOptions<RedSettings> redOptions,
@@ -25,6 +27,8 @@ public class RedDisponibleService
 
     public bool EstaDisponible()
     {
+        UltimoErrorMensaje = null;
+
         try
         {
             if (_red.UsarCredencialesConfiguradas &&
@@ -33,10 +37,21 @@ public class RedDisponibleService
                 EstablecerConexionUncSiAplica();
             }
 
-            return Directory.Exists(_rutas.RaizUnc);
+            if (!Directory.Exists(_rutas.RaizUnc))
+            {
+                UltimoErrorMensaje = $"No se puede acceder a la ruta UNC: {_rutas.RaizUnc}";
+                _logger.LogError(
+                    "RedNoDisponible | RaizUnc={RaizUnc} | Mensaje={Mensaje}",
+                    _rutas.RaizUnc,
+                    UltimoErrorMensaje);
+                return false;
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
+            UltimoErrorMensaje = ex.Message;
             _logger.LogError(
                 ex,
                 "RedNoDisponible | RaizUnc={RaizUnc}",

@@ -1,0 +1,33 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.Dashboard;
+}
+@model GestionArchivosEscaneados.Models.ViewModels.DashboardViewModel
+
+<div class="mb-3">
+    <a asp-controller="Home" asp-action="Index" class="btn btn-link ps-0">&larr; Volver al calendario</a>
+</div>
+
+<div class="page-header mb-4">
+    <h1 class="h3">@GestionArchivosEscaneados.Constants.EtiquetasUi.Dashboard</h1>
+    <p class="text-muted mb-0">Fecha: <strong>@Model.Fecha</strong></p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="stat-card stat-success">
+            <div class="stat-label">@GestionArchivosEscaneados.Constants.EtiquetasUi.Procesados</div>
+            <div class="stat-value">@Model.CantidadProcesados</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="stat-card stat-warning">
+            <div class="stat-label">@GestionArchivosEscaneados.Constants.EtiquetasUi.Pendientes</div>
+            <div class="stat-value">@Model.NoProcesados</div>
+        </div>
+    </div>
+</div>
+
+<a asp-action="NoProcesados" asp-route-fecha="@Model.Fecha" class="btn btn-primary btn-lg">
+    @GestionArchivosEscaneados.Constants.EtiquetasUi.NoProcesados
+</a>

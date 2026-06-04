@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RedDisponibleService>();
         services.AddSingleton<MoverArchivoService>();
         services.AddSingleton<LoteService>();
+        services.AddSingleton<IEmailNotificationService, EmailNotificationService>();
         services.AddHostedService<EscaneoWatcherService>();
 
         return services;

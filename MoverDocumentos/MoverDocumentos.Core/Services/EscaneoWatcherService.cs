@@ -18,9 +18,12 @@ public class EscaneoWatcherService : BackgroundService
     private readonly RedDisponibleService _redDisponibleService;
     private readonly MoverArchivoService _moverArchivoService;
     private readonly LoteService _loteService;
+    private readonly IEmailNotificationService _emailNotificationService;
 
     private readonly SemaphoreSlim _semaforoGlobal = new(1, 1);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _turnosPorArchivo =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _correoNasEnviadoPorLote =
         new(StringComparer.OrdinalIgnoreCase);
 
     private FileSystemWatcher? _watcher;
@@ -37,7 +40,8 @@ public class EscaneoWatcherService : BackgroundService
         EstructuraCarpetasService estructuraCarpetasService,
         RedDisponibleService redDisponibleService,
         MoverArchivoService moverArchivoService,
-        LoteService loteService)
+        LoteService loteService,
+        IEmailNotificationService emailNotificationService)
     {
         _rutas = rutasOptions.Value;
         _archivo = archivoOptions.Value;
@@ -49,6 +53,7 @@ public class EscaneoWatcherService : BackgroundService
         _redDisponibleService = redDisponibleService;
         _moverArchivoService = moverArchivoService;
         _loteService = loteService;
+        _emailNotificationService = emailNotificationService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -208,24 +213,36 @@ public class EscaneoWatcherService : BackgroundService
 
             try
             {
+                var usuario = _usuarioService.ObtenerUsuarioNormalizado();
+                var fecha = DateOnly.FromDateTime(DateTime.Now);
+                var claveLote = $"{usuario}|{fecha:yyyy-MM-dd}";
+
                 if (!_redDisponibleService.EstaDisponible())
                 {
                     _logger.LogError(
-                        "RedNoDisponible | RaizUnc={RaizUnc}",
-                        _rutas.RaizUnc);
+                        "RedNoDisponible | RaizUnc={RaizUnc} | Usuario={Usuario}",
+                        _rutas.RaizUnc,
+                        usuario);
+
+                    await NotificarFalloNasUnaVezAsync(
+                        claveLote,
+                        usuario,
+                        fecha,
+                        _redDisponibleService.UltimoErrorMensaje ??
+                        $"No se pudo conectar a la NAS en {_rutas.RaizUnc}",
+                        stoppingToken);
                     return;
                 }
 
                 await EsperarArchivoDisponibleAsync(ruta, stoppingToken);
-
-                var usuario = _usuarioService.ObtenerUsuarioNormalizado();
-                var fecha = DateOnly.FromDateTime(DateTime.Now);
 
                 _registroUsuarioService.RegistrarSiNoExiste(usuario);
 
                 var carpetaProcesar = _estructuraCarpetasService.CrearEstructuraDia(usuario, fecha);
                 _moverArchivoService.Mover(ruta, carpetaProcesar);
                 _loteService.RegistrarMovimiento(usuario, fecha, carpetaProcesar);
+
+                _correoNasEnviadoPorLote.TryRemove(claveLote, out _);
             }
             finally
             {
@@ -239,12 +256,72 @@ public class EscaneoWatcherService : BackgroundService
                 "ErrorProcesandoArchivo | Archivo={Archivo} | Mensaje={Mensaje}",
                 Path.GetFileName(ruta),
                 ex.Message);
+
+            if (EsErrorRelacionadoConNas(ex))
+            {
+                var usuario = _usuarioService.ObtenerUsuarioNormalizado();
+                var fecha = DateOnly.FromDateTime(DateTime.Now);
+                var claveLote = $"{usuario}|{fecha:yyyy-MM-dd}";
+
+                await NotificarFalloNasUnaVezAsync(
+                    claveLote,
+                    usuario,
+                    fecha,
+                    ex.Message,
+                    stoppingToken);
+            }
         }
         finally
         {
             turno.Release();
         }
     }
+
+    private async Task NotificarFalloNasUnaVezAsync(
+        string claveLote,
+        string usuario,
+        DateOnly fecha,
+        string errorMensaje,
+        CancellationToken stoppingToken)
+    {
+        if (!_correoNasEnviadoPorLote.TryAdd(claveLote, 0))
+            return;
+
+        try
+        {
+            var rutaProcesar = _estructuraCarpetasService.ObtenerCarpetaProcesar(usuario, fecha);
+            var cantidadPendientes = ContarPdfsPendientesEnLocal();
+
+            await _emailNotificationService.EnviarFalloNasAsync(
+                usuario,
+                fecha,
+                cantidadPendientes,
+                rutaProcesar,
+                errorMensaje,
+                stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            _correoNasEnviadoPorLote.TryRemove(claveLote, out _);
+            _logger.LogError(
+                ex,
+                "ErrorEnviandoCorreoNas | Usuario={Usuario} | Fecha={Fecha}",
+                usuario,
+                fecha);
+        }
+    }
+
+    private int ContarPdfsPendientesEnLocal()
+    {
+        if (!Directory.Exists(_rutas.CarpetaLocal))
+            return 0;
+
+        return Directory.GetFiles(_rutas.CarpetaLocal, "*.pdf").Length;
+    }
+
+    private static bool EsErrorRelacionadoConNas(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException
+            or System.ComponentModel.Win32Exception;
 
     private async Task EsperarArchivoDisponibleAsync(string ruta, CancellationToken stoppingToken)
     {

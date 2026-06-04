@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\GestionArchivosEscaneados.Application\GestionArchivosEscaneados.Application.csproj" />
+    <ProjectReference Include="..\GestionArchivosEscaneados.Constants\GestionArchivosEscaneados.Constants.csproj" />
+    <ProjectReference Include="..\GestionArchivosEscaneados.Models\GestionArchivosEscaneados.Models.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

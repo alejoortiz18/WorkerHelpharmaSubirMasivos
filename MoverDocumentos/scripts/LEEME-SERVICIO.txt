@@ -1,0 +1,19 @@
+Helpharma - Worker 1 (MoverDocumentos)
+======================================
+
+INSTALAR COMO SERVICIO WINDOWS
+------------------------------
+1. Abrir PowerShell como Administrador.
+2. Ir a la carpeta donde está MoverDocumentos.exe (publicación).
+3. Ejecutar:
+
+   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   .\instalar-servicio.ps1
+
+DESINSTALAR
+-----------
+   .\desinstalar-servicio.ps1
+
+LOGS
+----
+Visor de eventos -> Registros de Windows -> Aplicación -> origen "MoverDocumentos"

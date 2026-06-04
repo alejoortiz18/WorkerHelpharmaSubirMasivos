@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @GestionArchivosEscaneados.Constants.EtiquetasUi.TituloApp</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="app-body">
+    <header class="app-header shadow-sm">
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">@GestionArchivosEscaneados.Constants.EtiquetasUi.TituloApp</a>
+                @if (Context.Session.GetString(GestionArchivosEscaneados.Constants.SessionKeys.Usuario) is string usuario)
+                {
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white-50 small">@usuario</span>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-light btn-sm">@GestionArchivosEscaneados.Constants.EtiquetasUi.CerrarSesion</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </nav>
+    </header>
+    <main class="container-fluid app-main py-4">
+        @RenderBody()
+    </main>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

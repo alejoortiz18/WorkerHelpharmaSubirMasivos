@@ -1,0 +1,27 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.Login;
+}
+@model GestionArchivosEscaneados.Models.ViewModels.LoginViewModel
+
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm border-0 login-card">
+            <div class="card-body p-4">
+                <h1 class="h4 mb-4 text-center">@GestionArchivosEscaneados.Constants.EtiquetasUi.TituloApp</h1>
+                <form asp-action="Login" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label asp-for="Usuario" class="form-label">@GestionArchivosEscaneados.Constants.EtiquetasUi.Usuario</label>
+                        <input asp-for="Usuario" class="form-control form-control-lg" autocomplete="username" autofocus />
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.Error))
+                    {
+                        <div class="alert alert-warning whitespace-pre-line">@Model.Error</div>
+                    }
+                    <button type="submit" class="btn btn-primary w-100 btn-lg">@GestionArchivosEscaneados.Constants.EtiquetasUi.Login</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

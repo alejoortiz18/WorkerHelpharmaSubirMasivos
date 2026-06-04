@@ -22,6 +22,15 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
     </Content>
+    <None Include="..\scripts\instalar-servicio.ps1" Link="instalar-servicio.ps1">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </None>
+    <None Include="..\scripts\desinstalar-servicio.ps1" Link="desinstalar-servicio.ps1">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </None>
+    <None Include="..\scripts\LEEME-SERVICIO.txt" Link="LEEME-SERVICIO.txt">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

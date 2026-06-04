@@ -1,0 +1,65 @@
+@using System.Globalization
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.Calendario;
+    var cultura = CultureInfo.GetCultureInfo("es-CO");
+    var primerDia = new DateTime(Model.Anio, Model.Mes, 1);
+    var diasEnMes = DateTime.DaysInMonth(Model.Anio, Model.Mes);
+    var offset = ((int)primerDia.DayOfWeek + 6) % 7;
+    var mesAnterior = primerDia.AddMonths(-1);
+    var mesSiguiente = primerDia.AddMonths(1);
+}
+@model GestionArchivosEscaneados.Models.ViewModels.CalendarioViewModel
+
+<div class="page-header mb-4">
+    <h1 class="h3 mb-1">@GestionArchivosEscaneados.Constants.EtiquetasUi.Calendario</h1>
+    <p class="text-muted mb-0">Seleccione un día con archivos escaneados.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.Error))
+{
+    <div class="alert alert-warning">@Model.Error</div>
+}
+
+<div class="card shadow-sm border-0 calendar-card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-anio="@mesAnterior.Year" asp-route-mes="@mesAnterior.Month">&larr;</a>
+        <h2 class="h5 mb-0 text-capitalize">@cultura.DateTimeFormat.GetMonthName(Model.Mes) @Model.Anio</h2>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-anio="@mesSiguiente.Year" asp-route-mes="@mesSiguiente.Month">&rarr;</a>
+    </div>
+    <div class="card-body">
+        <div class="calendar-grid mb-2">
+            @foreach (var dia in new[] { "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" })
+            {
+                <div class="calendar-weekday">@dia</div>
+            }
+        </div>
+        <div class="calendar-grid">
+            @for (var i = 0; i < offset; i++)
+            {
+                <div class="calendar-cell empty"></div>
+            }
+            @for (var dia = 1; dia <= diasEnMes; dia++)
+            {
+                var fecha = new DateTime(Model.Anio, Model.Mes, dia).ToString("yyyy-MM-dd");
+                var disponible = Model.FechasDisponibles.Contains(fecha);
+                if (disponible)
+                {
+                    <form asp-action="SeleccionarFecha" method="post" class="calendar-cell m-0">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="anio" value="@Model.Anio" />
+                        <input type="hidden" name="mes" value="@Model.Mes" />
+                        <input type="hidden" name="dia" value="@dia" />
+                        <button type="submit" class="calendar-day available" title="@fecha">@dia</button>
+                    </form>
+                }
+                else
+                {
+                    <div class="calendar-cell">
+                        <span class="calendar-day disabled">@dia</span>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>

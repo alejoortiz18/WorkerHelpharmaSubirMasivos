@@ -20,6 +20,8 @@ public static class SoporteServiceCollectionExtensions
         services.AddHttpClient<SoporteApiService>();
         services.AddHttpClient<SoporteFisicoApiService>();
         services.AddSingleton<SoporteProcesamientoService>();
+        services.AddSingleton<ISoporteProcesamientoService>(sp =>
+            sp.GetRequiredService<SoporteProcesamientoService>());
 
         return services;
     }

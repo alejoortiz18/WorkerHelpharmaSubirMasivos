@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\GestionArchivosEscaneados.Models\GestionArchivosEscaneados.Models.csproj" />
+    <ProjectReference Include="..\GestionArchivosEscaneados.Constants\GestionArchivosEscaneados.Constants.csproj" />
+    <ProjectReference Include="..\GestionArchivosEscaneados.Infrastructure\GestionArchivosEscaneados.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

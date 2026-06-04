@@ -1,0 +1,12 @@
+Analiza la imagen adjunta de la primera hoja de un documento escaneado.
+
+Tu tarea es identificar el código de barras principal impreso en el documento.
+
+Reglas estrictas:
+- Analiza únicamente el código de barras principal visible en la imagen.
+- No inventes valores ni completes dígitos faltantes.
+- Si no puedes leer un código de barras válido con certeza, responde exactamente: NO_BARCODE
+- Si encuentras un código válido, responde únicamente el valor exacto del código, sin espacios, guiones ni texto adicional.
+- El formato esperado del código es letras mayúsculas seguidas de números (ejemplo: KV351697).
+
+Responde con una sola línea.

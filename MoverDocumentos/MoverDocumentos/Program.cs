@@ -18,6 +18,7 @@ builder.Services.Configure<RedSettings>(builder.Configuration.GetSection("Red"))
 builder.Services.Configure<LoteSettings>(builder.Configuration.GetSection("Lote"));
 builder.Services.Configure<ArchivoSettings>(builder.Configuration.GetSection("Archivo"));
 builder.Services.Configure<ReintentosSettings>(builder.Configuration.GetSection("Reintentos"));
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
 
 builder.Services.AddMoverDocumentosCore();
 builder.Services.AddHostedService<Worker>();

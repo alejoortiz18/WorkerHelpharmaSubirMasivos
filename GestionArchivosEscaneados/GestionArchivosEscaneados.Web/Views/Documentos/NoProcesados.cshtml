@@ -1,0 +1,282 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.NoProcesados;
+}
+@model GestionArchivosEscaneados.Models.ViewModels.NoProcesadosViewModel
+
+<div class="docs-workspace">
+    <div class="docs-toolbar mb-3">
+        <a asp-action="Dashboard" asp-route-fecha="@Model.Fecha" class="btn btn-link ps-0 docs-back">&larr; @GestionArchivosEscaneados.Constants.EtiquetasUi.VolverResumen</a>
+        <div class="docs-toolbar-meta">
+            <span class="badge docs-date-badge">@Model.Fecha</span>
+            <span class="text-muted small">@Model.Archivos.Count documento(s) pendiente(s)</span>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeExito))
+    {
+        <div class="alert alert-success docs-alert">@Model.MensajeExito</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeAdvertencia))
+    {
+        <div class="alert alert-warning docs-alert">@Model.MensajeAdvertencia</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeError))
+    {
+        <div class="alert alert-danger docs-alert whitespace-pre-line">@Model.MensajeError</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-xl-5">
+            <form asp-action="ProcesarLote" method="post" id="formProcesarLote" class="docs-form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Fecha" />
+                <input type="hidden" asp-for="ArchivoSeleccionado" id="archivoSeleccionado" />
+
+                <div class="card shadow-sm border-0 docs-table-card h-100">
+                    <div class="card-header bg-white docs-table-header">
+                        <div>
+                            <h2 class="h5 mb-1">@GestionArchivosEscaneados.Constants.EtiquetasUi.NoProcesados</h2>
+                            <p class="text-muted small mb-0">Ingrese el código de barras en cada fila y procese todos a la vez.</p>
+                        </div>
+                    </div>
+
+                    @if (Model.Archivos.Count == 0)
+                    {
+                        <div class="docs-empty-state">
+                            <p class="mb-0">@GestionArchivosEscaneados.Constants.EtiquetasUi.SinDocumentosPendientes</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive docs-table-wrap">
+                            <table class="table docs-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="docs-col-file">@GestionArchivosEscaneados.Constants.EtiquetasUi.Archivo</th>
+                                        <th class="docs-col-date">@GestionArchivosEscaneados.Constants.EtiquetasUi.Fecha</th>
+                                        <th class="docs-col-barcode">@GestionArchivosEscaneados.Constants.EtiquetasUi.CodigoBarras</th>
+                                        <th class="docs-col-actions"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (var i = 0; i < Model.Archivos.Count; i++)
+                                    {
+                                        var archivo = Model.Archivos[i];
+                                        var seleccionado = Model.ArchivoSeleccionado == archivo.NombreArchivo;
+                                        <tr class="docs-row @(seleccionado ? "is-selected" : "") @(archivo.ErrorProceso ? "has-error" : "")"
+                                            data-archivo="@archivo.NombreArchivo"
+                                            data-pdf-url="@Url.Action("Pdf", new { fecha = Model.Fecha, archivo = archivo.NombreArchivo })">
+                                            <td class="docs-col-file">
+                                                <input type="hidden" asp-for="Archivos[i].NombreArchivo" />
+                                                <input type="hidden" asp-for="Archivos[i].Fecha" />
+                                                <span class="docs-file-name" title="@archivo.NombreArchivo">@archivo.NombreArchivo</span>
+                                            </td>
+                                            <td class="docs-col-date">
+                                                <span class="docs-date-pill">@archivo.Fecha</span>
+                                            </td>
+                                            <td class="docs-col-barcode">
+                                                <input asp-for="Archivos[i].CodigoBarras"
+                                                       class="form-control form-control-sm barcode-input"
+                                                       autocomplete="off"
+                                                       placeholder="Código Barras ej: ME-123"
+                                                       data-index="@i" />
+                                            </td>
+                                            <td class="docs-col-actions text-end">
+                                                <div class="docs-row-actions">
+                                                    <button type="button"
+                                                            class="btn btn-sm docs-btn-view @(seleccionado ? "btn-primary is-viewing" : "btn-outline-primary")"
+                                                            title="@GestionArchivosEscaneados.Constants.EtiquetasUi.Ver">
+                                                        @GestionArchivosEscaneados.Constants.EtiquetasUi.Ver
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger docs-btn-delete"
+                                                            title="@GestionArchivosEscaneados.Constants.EtiquetasUi.Eliminar"
+                                                            data-archivo="@archivo.NombreArchivo"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#modalEliminar">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="card-footer bg-white docs-table-footer">
+                            <div class="docs-footer-info">
+                                <span class="docs-ready-count">
+                                    <strong id="countListos">0</strong> @GestionArchivosEscaneados.Constants.EtiquetasUi.ListosParaProcesar
+                                </span>
+                            </div>
+                            <button type="submit" class="btn btn-primary docs-btn-process" id="btnProcesar" disabled>
+                                @GestionArchivosEscaneados.Constants.EtiquetasUi.ProcesarLote
+                            </button>
+                        </div>
+                    }
+                </div>
+            </form>
+        </div>
+
+        <div class="col-xl-7">
+            <div class="card shadow-sm border-0 pdf-panel h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h2 class="h6 mb-0">@GestionArchivosEscaneados.Constants.EtiquetasUi.VistaPrevia</h2>
+                    <span class="text-muted small docs-preview-name" id="previewFileName">
+                        @(Model.ArchivoSeleccionado ?? "—")
+                    </span>
+                </div>
+                <div class="card-body p-0 pdf-viewer-wrap">
+                    @if (!string.IsNullOrWhiteSpace(Model.ArchivoSeleccionado))
+                    {
+                        <iframe title="PDF"
+                                id="pdfFrame"
+                                src="@Url.Action("Pdf", new { fecha = Model.Fecha, archivo = Model.ArchivoSeleccionado })"
+                                class="pdf-frame"></iframe>
+                    }
+                    else
+                    {
+                        <div class="pdf-placeholder text-muted" id="pdfPlaceholder">
+                            @GestionArchivosEscaneados.Constants.EtiquetasUi.SeleccionarDocumento
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEliminar" tabindex="-1" aria-labelledby="modalEliminarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content docs-delete-modal">
+            <form asp-action="Eliminar" method="post" id="formEliminar">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Fecha" value="@Model.Fecha" />
+                <input type="hidden" name="NombreArchivo" id="eliminarNombreArchivo" />
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="modalEliminarLabel">@GestionArchivosEscaneados.Constants.EtiquetasUi.ConfirmarEliminacion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@GestionArchivosEscaneados.Constants.EtiquetasUi.Cancelar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2 text-muted small whitespace-pre-line">@GestionArchivosEscaneados.Constants.MensajesUsuario.ConfirmarEliminacionDocumento</p>
+                    <p class="mb-0 fw-semibold text-break small" id="eliminarArchivoNombre"></p>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">@GestionArchivosEscaneados.Constants.EtiquetasUi.Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-danger">@GestionArchivosEscaneados.Constants.EtiquetasUi.Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('formProcesarLote');
+            if (!form) return;
+
+            const hiddenSeleccionado = document.getElementById('archivoSeleccionado');
+            const btnProcesar = document.getElementById('btnProcesar');
+            const countListos = document.getElementById('countListos');
+            const pdfFrame = document.getElementById('pdfFrame');
+            const previewFileName = document.getElementById('previewFileName');
+            const inputs = form.querySelectorAll('.barcode-input');
+
+            function countFilled() {
+                let n = 0;
+                inputs.forEach(i => { if (i.value.trim()) n++; });
+                return n;
+            }
+
+            function updateProcessButton() {
+                const n = countFilled();
+                countListos.textContent = n;
+                btnProcesar.disabled = n === 0;
+            }
+
+            function selectRow(row, focusBarcode) {
+                form.querySelectorAll('.docs-row').forEach(r => {
+                    r.classList.remove('is-selected');
+                    const btn = r.querySelector('.docs-btn-view');
+                    if (btn) {
+                        btn.classList.remove('btn-primary', 'is-viewing');
+                        btn.classList.add('btn-outline-primary');
+                    }
+                });
+
+                row.classList.add('is-selected');
+                const viewBtn = row.querySelector('.docs-btn-view');
+                if (viewBtn) {
+                    viewBtn.classList.remove('btn-outline-primary');
+                    viewBtn.classList.add('btn-primary', 'is-viewing');
+                }
+
+                const archivo = row.dataset.archivo;
+                const pdfUrl = row.dataset.pdfUrl;
+                hiddenSeleccionado.value = archivo;
+                previewFileName.textContent = archivo;
+
+                let frame = document.getElementById('pdfFrame');
+                if (!frame) {
+                    const wrap = document.querySelector('.pdf-viewer-wrap');
+                    wrap.innerHTML = '';
+                    frame = document.createElement('iframe');
+                    frame.id = 'pdfFrame';
+                    frame.className = 'pdf-frame';
+                    frame.title = 'PDF';
+                    wrap.appendChild(frame);
+                }
+                frame.src = pdfUrl;
+
+                row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+                if (focusBarcode) {
+                    row.querySelector('.barcode-input')?.focus();
+                }
+            }
+
+            form.querySelectorAll('.docs-row').forEach(row => {
+                row.addEventListener('click', e => {
+                    if (e.target.closest('.barcode-input') || e.target.closest('.docs-btn-view') || e.target.closest('.docs-btn-delete')) return;
+                    selectRow(row, false);
+                });
+
+                row.querySelector('.docs-btn-view')?.addEventListener('click', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectRow(row, true);
+                });
+            });
+
+            document.querySelectorAll('.docs-btn-delete').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const nombre = btn.dataset.archivo ?? '';
+                    document.getElementById('eliminarNombreArchivo').value = nombre;
+                    document.getElementById('eliminarArchivoNombre').textContent = nombre;
+                });
+            });
+
+            inputs.forEach((input, idx) => {
+                input.addEventListener('input', updateProcessButton);
+                input.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const next = inputs[idx + 1];
+                        if (next) {
+                            selectRow(next.closest('.docs-row'), true);
+                        }
+                    }
+                });
+            });
+
+            updateProcessButton();
+        })();
+    </script>
+}

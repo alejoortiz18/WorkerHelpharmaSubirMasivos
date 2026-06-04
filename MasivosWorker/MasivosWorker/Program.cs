@@ -4,49 +4,64 @@ using Models;
 using Models.Dto;
 using Services;
 
-// Al correr como servicio de Windows, el directorio de trabajo es System32.
-// Fijar ContentRootPath al directorio del exe garantiza que appsettings.json
-// siempre se encuentre, independientemente del PC o usuario que ejecute el servicio.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
     Args = args,
     ContentRootPath = AppContext.BaseDirectory
 });
 
-// 🔥 ESTO ES LO QUE TE FALTABA
 builder.Services.AddWindowsService(options =>
 {
     options.ServiceName = "MasivosWorker";
 });
 
-// Configuración
 builder.Services.Configure<IronBarcodeSettings>(
     builder.Configuration.GetSection("IronBarcode"));
 
 builder.Services.Configure<RutasSettings>(
     builder.Configuration.GetSection("Rutas"));
 
+builder.Services.Configure<FileSettings>(
+    builder.Configuration.GetSection("FileSettings"));
+
+builder.Services.Configure<OpenAiSettings>(
+    builder.Configuration.GetSection("OpenAi"));
+
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("Email"));
+
 builder.Services.AddSoporteHelpharmaIntegracion(builder.Configuration);
 
 builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<FileManagerInfraestructure>();
-builder.Services.AddSingleton<FileWatcherInfraestructure>();
+builder.Services.AddSingleton<DocumentoProcesamientoService>();
+builder.Services.AddSingleton<IDocumentoProcesamientoService>(sp =>
+    sp.GetRequiredService<DocumentoProcesamientoService>());
+builder.Services.AddSingleton<LoteWatcherInfrastructure>();
+builder.Services.AddSingleton<LoteProcesamientoService>();
+builder.Services.AddSingleton<LogDiarioService>();
 builder.Services.AddSingleton<BarcodeRegionService>();
+builder.Services.AddSingleton<EmailNotificationService>();
+builder.Services.AddSingleton<IEmailNotificationService>(sp =>
+    sp.GetRequiredService<EmailNotificationService>());
+builder.Services.AddHttpClient<OpenAiBarcodeService>();
+builder.Services.AddSingleton<IOpenAiBarcodeService>(sp =>
+    sp.GetRequiredService<OpenAiBarcodeService>());
 
-// Worker
 builder.Services.AddHostedService<Worker>();
-builder.Services.Configure<FileSettings>(
-    builder.Configuration.GetSection("FileSettings"));
+
 var host = builder.Build();
 
-// Inicializar licencia (valida y loguea si es correcta o no)
 host.Services.GetRequiredService<IronBarcodeLicenseInitializer>();
 
-// Log de ruta de configuración para diagnóstico en producción
 var startupLogger = host.Services.GetRequiredService<ILogger<Program>>();
+var rutas = builder.Configuration.GetSection("Rutas").Get<RutasSettings>();
+
 startupLogger.LogInformation(
-    "Startup | ContentRoot={ContentRoot} | Env={Env}",
+    "Startup | ContentRoot={ContentRoot} | Env={Env} | RaizUnc={RaizUnc} | ArchivosNuevos={ArchivosNuevos}",
     builder.Environment.ContentRootPath,
-    builder.Environment.EnvironmentName);
+    builder.Environment.EnvironmentName,
+    rutas?.RaizUnc,
+    rutas?.RutaArchivosNuevos);
 
 host.Run();

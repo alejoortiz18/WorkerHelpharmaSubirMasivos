@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="GestionArchivosEscaneados.Application/GestionArchivosEscaneados.Application.csproj" />
+  <Project Path="GestionArchivosEscaneados.Constants/GestionArchivosEscaneados.Constants.csproj" />
+  <Project Path="GestionArchivosEscaneados.Infrastructure/GestionArchivosEscaneados.Infrastructure.csproj" />
+  <Project Path="GestionArchivosEscaneados.Models/GestionArchivosEscaneados.Models.csproj" />
+  <Project Path="GestionArchivosEscaneados.Tests/GestionArchivosEscaneados.Tests.csproj" />
+  <Project Path="GestionArchivosEscaneados.Web/GestionArchivosEscaneados.Web.csproj" />
+</Solution>

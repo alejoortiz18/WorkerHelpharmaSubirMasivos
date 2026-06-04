@@ -9,7 +9,7 @@ namespace Services;
 /// 2) POST soporte/fisico con datos + PDF completo
 /// El portal MVC debe usar esta clase (no reimplementar las llamadas HTTP).
 /// </summary>
-public class SoporteProcesamientoService
+public class SoporteProcesamientoService : ISoporteProcesamientoService
 {
     private readonly SoporteApiService _soporteApi;
     private readonly SoporteFisicoApiService _soporteFisicoApi;

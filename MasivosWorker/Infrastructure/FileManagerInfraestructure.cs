@@ -1,4 +1,3 @@
-﻿using IWshRuntimeLibrary;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Models;
@@ -9,109 +8,119 @@ namespace Infrastructure
 {
     public class FileManagerInfraestructure
     {
-        private readonly RutasSettings _rutas;
         private readonly ILogger<FileManagerInfraestructure> _logger;
         private readonly string _fileName;
+        private readonly bool _aplicarPrefijoKeyName;
 
         public FileManagerInfraestructure(
-            IOptions<RutasSettings> rutasOptions,
             IOptions<FileSettings> fileOptions,
             ILogger<FileManagerInfraestructure> logger)
         {
-            _rutas = rutasOptions.Value;
             _logger = logger;
             _fileName = fileOptions.Value.KeyName;
+            _aplicarPrefijoKeyName = fileOptions.Value.AplicarPrefijoKeyName;
         }
 
-        public void CrearCarpetasSiNoExisten()
+        /// <summary>
+        /// Las carpetas del lote las crea Worker 1; Worker 2 solo valida que existan.
+        /// </summary>
+        public void ValidarCarpetasLoteExisten(RutasLoteContext contexto)
         {
-            CrearCarpeta(_rutas.Procesar);
-            CrearCarpeta(_rutas.Procesando); // 🔥 NUEVO
-            CrearCarpeta(_rutas.Error);
-            CrearCarpeta(_rutas.Procesados);
-        }
-
-        private void CrearCarpeta(string ruta)
-        {
-            if (!Directory.Exists(ruta))
+            foreach (var carpeta in contexto.CarpetasOperativas)
             {
-                Directory.CreateDirectory(ruta);
-                _logger.LogInformation($"Carpeta creada: {ruta}");
+                if (!Directory.Exists(carpeta))
+                {
+                    throw new InvalidOperationException(
+                        $"Carpeta requerida no existe (debe ser creada previamente): {carpeta}");
+                }
             }
         }
 
-        public void CrearAccesosDirectos()
-        {
-            string escritorio = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        public string MoverAProcesando(string rutaOrigen, RutasLoteContext contexto) =>
+            MoverArchivo(rutaOrigen, contexto.Procesando, "PROCESANDO");
 
-            CrearAccesoDirecto(escritorio, "Procesar", _rutas.Procesar);
-            CrearAccesoDirecto(escritorio, "Procesando", _rutas.Procesando); // 🔥 NUEVO
-            CrearAccesoDirecto(escritorio, "Errores", _rutas.Error);
+        public void MoverAProcesados(string rutaOrigen, string nuevoNombre, RutasLoteContext contexto) =>
+            MoverArchivoConNombre(rutaOrigen, contexto.Procesados, nuevoNombre, "PROCESADOS");
+
+        public void MoverAError(string rutaOrigen, RutasLoteContext contexto) =>
+            MoverArchivo(rutaOrigen, contexto.Error, "ERROR");
+
+        public void MoverAProcesaria(string rutaOrigen, RutasLoteContext contexto) =>
+            MoverArchivo(rutaOrigen, contexto.Procesaria, "PROCESARIA");
+
+        public void MoverANoprocesados(string rutaOrigen, RutasLoteContext contexto) =>
+            MoverArchivo(rutaOrigen, contexto.Noprocesados, "NOPROCESADOS");
+
+        public void LimpiarArchivosTemporales(RutasLoteContext contexto)
+        {
+            foreach (var carpeta in contexto.CarpetasLimpieza)
+                EliminarArchivosEnCarpeta(carpeta);
         }
 
-        private void CrearAccesoDirecto(string escritorio, string nombre, string rutaDestino)
+        public void EliminarArchivosEnCarpeta(string carpeta)
         {
-            string rutaAcceso = Path.Combine(escritorio, $"{nombre}.lnk");
-
-            if (File.Exists(rutaAcceso))
+            if (!Directory.Exists(carpeta))
                 return;
 
-            var shell = new WshShell();
-            var acceso = (IWshShortcut)shell.CreateShortcut(rutaAcceso);
-
-            acceso.TargetPath = rutaDestino;
-            acceso.WorkingDirectory = rutaDestino;
-            acceso.Save();
-
-            _logger.LogInformation($"Acceso directo creado: {rutaAcceso}");
+            foreach (var archivo in Directory.GetFiles(carpeta))
+            {
+                try
+                {
+                    File.Delete(archivo);
+                    _logger.LogDebug("ArchivoEliminado | Ruta={Ruta}", archivo);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "ErrorEliminandoArchivo | Ruta={Ruta}", archivo);
+                }
+            }
         }
 
-        public string MoverAProcesando(string rutaOrigen)
+        private string MoverArchivo(
+            string rutaOrigen,
+            string carpetaDestino,
+            string etiqueta)
         {
             var nombre = Path.GetFileName(rutaOrigen);
-            var nombreFinal = NormalizarNombreConPrefijo(nombre);
-            var destino = Path.Combine(_rutas.Procesando, nombreFinal);
+            var nombreFinal = NormalizarNombre(nombre);
+            var destino = Path.Combine(carpetaDestino, nombreFinal);
 
             File.Move(rutaOrigen, destino, true);
 
-            _logger.LogInformation($"Archivo movido a PROCESANDO: {nombreFinal}");
+            _logger.LogInformation(
+                "ArchivoMovido | Destino={Destino} | Archivo={Archivo}",
+                etiqueta,
+                nombreFinal);
 
             return destino;
         }
 
-        public void MoverAProcesados(string rutaOrigen, string nuevoNombre)
+        private void MoverArchivoConNombre(
+            string rutaOrigen,
+            string carpetaDestino,
+            string nuevoNombre,
+            string etiqueta)
         {
-            var destino = Path.Combine(_rutas.Procesados, NormalizarNombreConPrefijo(nuevoNombre));
+            var destino = Path.Combine(carpetaDestino, NormalizarNombre(nuevoNombre));
 
             File.Move(rutaOrigen, destino, true);
 
-            _logger.LogInformation($"Archivo movido a PROCESADOS: {nuevoNombre}");
+            _logger.LogInformation(
+                "ArchivoMovido | Destino={Destino} | Archivo={Archivo}",
+                etiqueta,
+                Path.GetFileName(destino));
         }
 
-        public void MoverAError(string rutaOrigen)
+        private string NormalizarNombre(string nombreArchivo)
         {
-            var nombre = Path.GetFileName(rutaOrigen);
-            var nombreFinal = NormalizarNombreConPrefijo(nombre);
-            var destino = Path.Combine(_rutas.Error, nombreFinal);
+            if (!_aplicarPrefijoKeyName)
+                return nombreArchivo;
 
-            File.Move(rutaOrigen, destino, true);
-
-            _logger.LogWarning($"Archivo movido a ERROR: {nombreFinal}");
-        }
-
-        public void MoverAErrorDesdeOrigen(string rutaOrigen)
-        {
-            var nombre = Path.GetFileName(rutaOrigen);
-            var nombreFinal = NormalizarNombreConPrefijo(nombre);
-            var destino = Path.Combine(_rutas.Error, nombreFinal);
-
-            File.Move(rutaOrigen, destino, true);
-
-            _logger.LogWarning($"Archivo movido a ERROR (desde origen): {nombreFinal}");
+            return NormalizarNombreConPrefijo(nombreArchivo, _fileName);
         }
 
         /// <summary>
-        /// Quita prefijos repetidos al inicio y deja exactamente uno (p. ej. tras reintentos desde /error).
+        /// Quita prefijos repetidos al inicio y deja exactamente uno.
         /// </summary>
         public static string NormalizarNombreConPrefijo(string nombreArchivo, string prefijo)
         {
@@ -125,11 +134,7 @@ namespace Infrastructure
             return $"{prefijo}{nombre}";
         }
 
-        /// <inheritdoc cref="NormalizarNombreConPrefijo(string, string)"/>
         public static string AplicarPrefijoSiFalta(string nombreArchivo, string prefijo) =>
             NormalizarNombreConPrefijo(nombreArchivo, prefijo);
-
-        private string NormalizarNombreConPrefijo(string nombreArchivo) =>
-            NormalizarNombreConPrefijo(nombreArchivo, _fileName);
     }
 }

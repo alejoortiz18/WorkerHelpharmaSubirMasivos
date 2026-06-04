@@ -1,4 +1,4 @@
-﻿using IronBarCode;
+using IronBarCode;
 using IronPdf;
 using Microsoft.Extensions.Logging;
 using Models.Dto;
@@ -15,6 +15,23 @@ public class BarcodeRegionService
     public BarcodeRegionService(ILogger<BarcodeRegionService> logger)
     {
         _logger = logger;
+    }
+
+    public bool EsPdfLegible(string rutaPdf)
+    {
+        try
+        {
+            if (!File.Exists(rutaPdf))
+                return false;
+
+            using var pdf = PdfDocument.FromFile(rutaPdf);
+            return pdf.PageCount > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PdfNoLegible | Ruta={Ruta}", rutaPdf);
+            return false;
+        }
     }
 
     public DocumentoProcesadoDto ProcesarPdf(string rutaPdf)

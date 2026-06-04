@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema Masivos v3 — Flujo completo (izquierda → derecha)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --card: #151b24;
+      --border: #243044;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --pc: #805ad5;
+      --nas: #3182ce;
+      --w2: #38a169;
+      --mvc: #dd6b20;
+      --api: #d69e2e;
+      --s3: #e53e3e;
+      --nop: #c53030;
+      --mail: #4299e1;
+      --ok: #48bb78;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 28px 20px 56px;
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 28px; }
+    header h1 { font-size: 1.75rem; color: #63b3ed; font-weight: 700; }
+    header p { color: var(--muted); font-size: 0.92rem; max-width: 900px; margin: 10px auto 0; }
+    .flow-hint {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 14px; padding: 6px 14px;
+      background: #1e293b; border-radius: 999px; font-size: 0.78rem; color: #cbd5e1;
+    }
+    .flow-hint span { color: #63b3ed; font-weight: 600; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 28px 28px;
+      margin-bottom: 22px;
+    }
+    .card h2 { font-size: 1rem; color: #cbd5e1; margin-bottom: 4px; }
+    .card .sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 18px; }
+
+    /* ── Main LR pipeline (CSS) ── */
+    .pipeline {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      min-height: 200px;
+    }
+    .pipe-node {
+      flex: 1;
+      min-width: 155px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .pipe-box {
+      flex: 1;
+      border-radius: 12px;
+      padding: 16px 14px;
+      border: 2px solid;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pipe-box h3 { font-size: 0.82rem; font-weight: 700; letter-spacing: 0.02em; }
+    .pipe-box .host { font-size: 0.7rem; opacity: 0.85; font-family: Consolas, monospace; }
+    .pipe-box ul { list-style: none; font-size: 0.72rem; color: #cbd5e1; }
+    .pipe-box li::before { content: "› "; color: inherit; opacity: 0.6; }
+    .pipe-arrow {
+      display: flex; align-items: center; justify-content: center;
+      min-width: 36px; color: #64748b; font-size: 1.4rem; flex-shrink: 0;
+    }
+    .pipe-label {
+      position: absolute;
+      bottom: -22px; left: 50%; transform: translateX(-50%);
+      font-size: 0.65rem; color: var(--muted); white-space: nowrap;
+      background: var(--card); padding: 2px 6px; border-radius: 4px;
+    }
+
+    .node-pc .pipe-box { border-color: var(--pc); background: linear-gradient(145deg,#2d1f4e,#1a1225); }
+    .node-pc h3 { color: #d6bcfa; }
+    .node-api .pipe-box { border-color: var(--api); background: linear-gradient(145deg,#44337a,#2a2040); }
+    .node-api h3 { color: #faf089; }
+    .node-s3 .pipe-box { border-color: var(--s3); background: linear-gradient(145deg,#4a1520,#2d0f14); }
+    .node-s3 h3 { color: #feb2b2; }
+    .node-w2 .pipe-box { border-color: var(--w2); background: linear-gradient(145deg,#1c4532,#0f2418); }
+    .node-w2 h3 { color: #9ae6b4; }
+    .node-mvc .pipe-box { border-color: var(--mvc); background: linear-gradient(145deg,#4a2c0a,#2a1805); }
+    .node-mvc h3 { color: #fbd38d; }
+
+    /* ── NAS panel (bottom) ── */
+    .nas-panel {
+      margin-top: 36px;
+      border: 2px dashed var(--nas);
+      border-radius: 14px;
+      background: linear-gradient(180deg,#0f2744,#0a1929);
+      padding: 20px 24px;
+    }
+    .nas-panel h3 {
+      color: #90cdf4; font-size: 0.95rem; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .nas-panel h3 code { font-size: 0.85rem; color: #bee3f8; }
+    .nas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .nas-item {
+      background: #1a365d; border: 1px solid #2b6cb0;
+      border-radius: 8px; padding: 10px 12px; font-size: 0.72rem;
+    }
+    .nas-item strong { display: block; color: #bee3f8; margin-bottom: 4px; font-size: 0.75rem; }
+    .nas-item.nop { border-color: var(--nop); background: #3b1212; }
+    .nas-item.nop strong { color: #feb2b2; }
+    .nas-connectors {
+      display: flex; justify-content: space-around; flex-wrap: wrap;
+      gap: 12px; margin-top: 14px; font-size: 0.72rem; color: var(--muted);
+    }
+    .nas-connectors span { padding: 4px 10px; background: #1e293b; border-radius: 6px; }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px;
+    }
+    .leg {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; color: var(--muted);
+      padding: 4px 10px; background: #1e293b; border-radius: 6px;
+    }
+    .leg i { width: 10px; height: 10px; border-radius: 2px; display: block; }
+
+    /* ── Mermaid containers ── */
+    .mermaid { overflow-x: auto; }
+    .note {
+      margin-top: 14px; padding: 12px 14px;
+      background: #0f172a; border-left: 3px solid #63b3ed;
+      border-radius: 0 8px 8px 0; font-size: 0.8rem; color: var(--muted);
+    }
+
+    footer { text-align: center; font-size: 0.75rem; color: #475569; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Sistema Masivos v3 — Arquitectura y flujos</h1>
+    <p>
+      Escaneo transparente para el usuario · Procesamiento automático en servidor ·
+      PDFs procesados enviados a las <strong>APIs Helpharma</strong>, que los almacenan en <strong>AWS S3</strong> ·
+      NAS como almacén intermedio · Portal IIS para no procesados
+    </p>
+    <div class="flow-hint">
+      <span>←</span> Flujo principal de izquierda a derecha <span>→</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       1. PIPELINE PRINCIPAL (CSS — LR estricto)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>1. Vista general — pipeline izquierda → derecha</h2>
+    <p class="sub">El usuario solo escanea. Todo lo demás ocurre en servidores sin intervención del operador.</p>
+
+    <div class="pipeline">
+      <!-- PC / Worker 1 -->
+      <div class="pipe-node node-pc">
+        <div class="pipe-box">
+          <h3>① PC del usuario</h3>
+          <span class="host">C:\scaneo</span>
+          <ul>
+            <li>Escáner deposita PDF</li>
+            <li><strong>Worker 1</strong><br>MoverDocumentos</li>
+            <li>Detecta usuario</li>
+            <li>Mueve a NAS</li>
+            <li>Genera TXT lote</li>
+          </ul>
+        </div>
+        <span class="pipe-label">Escaneo</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <!-- Worker 2 -->
+      <div class="pipe-node node-w2">
+        <div class="pipe-box">
+          <h3>② Servidor Worker 2</h3>
+          <span class="host">10.0.0.3 · MasivosWorker</span>
+          <ul>
+            <li>Lee NAS (TXT + PDF)</li>
+            <li>Barcode / OpenAI</li>
+            <li>Envía PDF a APIs</li>
+            <li>No escribe en S3</li>
+          </ul>
+        </div>
+        <span class="pipe-label">Proceso automático</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <!-- APIs -->
+      <div class="pipe-node node-api">
+        <div class="pipe-box">
+          <h3>③ APIs Helpharma</h3>
+          <span class="host">api-soportes · intranet</span>
+          <ul>
+            <li><strong>API 1</strong> — Datos soporte</li>
+            <li><strong>API 2</strong> — PDF anexo</li>
+            <li>Reciben el archivo procesado</li>
+            <li><strong>Suben a AWS S3</strong></li>
+            <li>Worker 2 y MVC solo llaman HTTP</li>
+          </ul>
+        </div>
+        <span class="pipe-label">Envío del PDF</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <!-- S3 -->
+      <div class="pipe-node node-s3">
+        <div class="pipe-box">
+          <h3>④ AWS S3</h3>
+          <span class="host">Almacenamiento definitivo</span>
+          <ul>
+            <li>Destino final del PDF</li>
+            <li>Escrito por las APIs</li>
+            <li>No por Worker 2 ni MVC</li>
+            <li>Repositorio corporativo</li>
+          </ul>
+        </div>
+        <span class="pipe-label">Archivo procesado OK</span>
+      </div>
+    </div>
+
+    <!-- Second row: MVC + NAS -->
+    <div class="pipeline" style="margin-top: 48px; min-height: 160px;">
+      <div class="pipe-node node-mvc" style="flex:1;">
+        <div class="pipe-box">
+          <h3>⑤ Portal MVC (IIS)</h3>
+          <span class="host">Servidor local · IIS</span>
+          <ul>
+            <li>Reproceso manual</li>
+            <li>Lee NAS · noprocesados</li>
+            <li>Envía PDF a las mismas APIs</li>
+            <li>APIs → S3 (igual que W2)</li>
+          </ul>
+        </div>
+        <span class="pipe-label">Solo pendientes</span>
+      </div>
+
+      <div class="pipe-arrow" style="color:#4a5568; min-width:60px;">↕ NAS</div>
+
+      <div class="pipe-node" style="flex:2; min-width:200px;">
+        <div class="pipe-box" style="border-color:var(--nas); background:linear-gradient(145deg,#1a365d,#0f2744);">
+          <h3 style="color:#90cdf4;">NAS · tránsito local</h3>
+          <span class="host">\\192.168.0.69\ArchivosScaneados</span>
+          <ul>
+            <li>Worker 1 escribe PDF + TXT</li>
+            <li>Worker 2 lee y procesa</li>
+            <li>MVC lee noprocesados + log</li>
+            <li><em>No es el destino final — S3 sí lo es</em></li>
+          </ul>
+        </div>
+        <span class="pipe-label">Almacén compartido</span>
+      </div>
+    </div>
+
+    <!-- NAS bottom -->
+    <div class="nas-panel">
+      <h3>💾 NAS — almacenamiento compartido <code>\\192.168.0.69\ArchivosScaneados</code></h3>
+      <div class="nas-grid">
+        <div class="nas-item"><strong>Usuarios\usuarios.txt</strong>Login Worker 1 y MVC</div>
+        <div class="nas-item"><strong>ArchivosNuevos\*.txt</strong>Señal de lote → Worker 2</div>
+        <div class="nas-item"><strong>{usuario}\{fecha}\procesar</strong>PDFs entrantes</div>
+        <div class="nas-item"><strong>procesando / error / procesaria</strong>Estados temporales W2</div>
+        <div class="nas-item nop"><strong>noprocesados</strong>PDFs pendientes → MVC</div>
+        <div class="nas-item"><strong>procesados</strong>Local temporal post-API</div>
+        <div class="nas-item"><strong>log\{fecha}.txt</strong>Contadores del día</div>
+      </div>
+      <div class="nas-connectors">
+        <span>↑ Worker 1 escribe PDF + TXT</span>
+        <span>↔ Worker 2 (10.0.0.3) lee/escribe</span>
+        <span>↔ MVC IIS lee noprocesados + log</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="leg"><i style="background:var(--pc)"></i> PC usuario</div>
+      <div class="leg"><i style="background:var(--nas)"></i> NAS UNC</div>
+      <div class="leg"><i style="background:var(--w2)"></i> Worker 2 · 10.0.0.3</div>
+      <div class="leg"><i style="background:var(--mvc)"></i> MVC IIS</div>
+      <div class="leg"><i style="background:var(--api)"></i> APIs</div>
+      <div class="leg"><i style="background:var(--s3)"></i> AWS S3</div>
+      <div class="leg"><i style="background:var(--nop)"></i> No procesados</div>
+      <div class="leg"><i style="background:var(--mail)"></i> Correo</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       2. ENVÍO A S3 VÍA APIs (diagrama dedicado)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>2. Envío de archivos procesados — APIs → AWS S3</h2>
+    <p class="sub">
+      Worker 2 y MVC <strong>no suben directamente a S3</strong>. Envían el PDF por HTTPS a las APIs Helpharma;
+      el backend de la API 2 recibe el anexo y lo persiste en S3.
+    </p>
+    <div class="mermaid">
+flowchart LR
+    W2["Worker 2\n10.0.0.3"] -->|"HTTPS POST"| API1["API 1\nDatosSoportes\napi-soportes.helpharma.com.co"]
+    MVC["Portal MVC\nIIS"] -->|"HTTPS POST\n(reproceso)"| API1
+    API1 -->|"JSON datos soporte"| API2["API 2\nSoporte físico\nintranet.helpharma.com"]
+    W2 -->|"multipart:\ncódigo + metadatos\n+ anexo PDF"| API2
+    MVC -->|"multipart:\ncódigo + metadatos\n+ anexo PDF"| API2
+    API2 -->|"Backend Helpharma\nalmacena anexo"| S3[("AWS S3\nPDF definitivo")]
+
+    style W2 fill:#276749,color:#fff
+    style MVC fill:#c05621,color:#fff
+    style API1 fill:#744210,color:#fff
+    style API2 fill:#744210,color:#fff
+    style S3 fill:#c53030,color:#fff
+    </div>
+    <div class="note">
+      <strong>API 1:</strong> <code>POST /api/DocSoporte/soportes/DatosSoportes</code> — consulta datos del soporte por código de barras.<br>
+      <strong>API 2:</strong> <code>POST /api/v1/soporte/fisico</code> — recibe el PDF completo en el campo <code>anexo</code> (multipart/form-data).
+      Tras respuesta exitosa, el archivo procesado queda en <strong>AWS S3</strong> del lado Helpharma.
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       3. FLUJO AUTOMÁTICO LR
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>3. Flujo automático completo — escaneo a S3 (sin intervención del usuario)</h2>
+    <p class="sub">Worker 1 en PC · Worker 2 en 10.0.0.3 · NAS en tránsito · Destino final = S3 vía APIs</p>
+    <div class="mermaid">
+flowchart LR
+    A(["👤 Usuario escanea"]) --> B["C:\\scaneo\nPDF nuevo"]
+    B --> W1["Worker 1\nMoverDocumentos\n(PC)"]
+    W1 -->|"Mueve PDF"| P["NAS · procesar"]
+    W1 -->|"Crea TXT"| T["NAS · ArchivosNuevos"]
+    T --> W2["Worker 2\n10.0.0.3"]
+    P --> W2
+    W2 --> BC["IronBarcode\npág. 1"]
+    BC -->|"Código OK"| API1["API 1"]
+    API1 --> API2["API 2\n+ PDF anexo"]
+    API2 -->|"APIs suben"| S3[("AWS S3")]
+    W2 --> LOG["NAS · log\n+1 procesados"]
+    BC -->|"Sin código"| ERR["NAS · error"]
+    ERR --> W2B["Intento 2 y 3\nOpenAI"]
+    W2B -->|"Fallo OpenAI\nservicio"| MAIL["📧 Correo SMTP\nruta noprocesados"]
+    W2B -->|"NO_BARCODE\n/ fallo API"| NOP["NAS · noprocesados"]
+    MAIL --> NOP
+
+    style A fill:#553c9a,color:#fff
+    style W1 fill:#553c9a,color:#fff
+    style W2 fill:#276749,color:#fff
+    style W2B fill:#276749,color:#fff
+    style P fill:#2b6cb0,color:#fff
+    style T fill:#2b6cb0,color:#fff
+    style LOG fill:#2b6cb0,color:#fff
+    style NOP fill:#9b2c2c,color:#fff
+    style MAIL fill:#2c5282,color:#fff
+    style S3 fill:#c53030,color:#fff
+    style API1 fill:#744210,color:#fff
+    style API2 fill:#744210,color:#fff
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       4. WORKER 2 DETALLE LR
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>4. Worker 2 — detalle de procesamiento (servidor 10.0.0.3)</h2>
+    <p class="sub">Escucha <code>ArchivosNuevos\*.txt</code> · Cola secuencial · Escaneo cada 30 s</p>
+    <div class="mermaid">
+flowchart LR
+    START(["Inicio servicio"]) --> REC["Recuperar TXT\npendientes"]
+    REC --> WATCH["Watcher +\nescaneo 30s"]
+    WATCH --> TXT["Leer TXT\nlínea 1 = procesar"]
+    TXT --> VAL{"¿Carpetas\nOK?"}
+    VAL -->|"No"| KEEP["Conservar TXT\nLog error"]
+    VAL -->|"Sí"| T1["Intento 1\nBarcode + APIs"]
+    T1 -->|"OK"| OK["API 1 + API 2\n→ AWS S3"]
+    T1 -->|"Sin barcode"| E1["error"]
+    T1 -->|"Fallo API"| N1["noprocesados"]
+    E1 --> T2["Intento 2"]
+    N1 --> T2
+    T2 --> T3["Intento 3\nOpenAI"]
+    T3 -->|"Código"| OK
+    T3 -->|"Error servicio"| EM["📧 1 correo/lote\n+ noprocesados"]
+    T3 -->|"NO_BARCODE"| N2["noprocesados"]
+    OK --> LG["Log diario\n++procesados"]
+    N2 --> LG2["Log diario\n++noprocesados"]
+    EM --> LG2
+    LG --> DEL["Borrar TXT"]
+    LG2 --> DEL
+    DEL --> END(["Fin lote"])
+
+    style START fill:#276749,color:#fff
+    style OK fill:#276749,color:#fff
+    style EM fill:#2c5282,color:#fff
+    style N1 fill:#9b2c2c,color:#fff
+    style N2 fill:#9b2c2c,color:#fff
+    style KEEP fill:#744210,color:#fff
+    </div>
+    <div class="note">
+      <strong>Correo (Worker 2):</strong> se envía <em>un correo por lote</em> cuando OpenAI falla por error de servicio
+      (cuota, timeout, etc.). Incluye usuario, fecha, cantidad de archivos, mensaje de error y ruta UNC de
+      <code>noprocesados</code>. SMTP Office 365 — destinatarios en configuración del servicio.
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       4. NO PROCESADOS + MVC LR
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>5. No procesados — portal MVC (IIS) y reproceso manual</h2>
+    <p class="sub">El usuario interviene solo cuando quedan PDFs en <code>noprocesados</code></p>
+    <div class="mermaid">
+flowchart LR
+    NOP[("NAS · noprocesados\nPDF pendientes")] --> WEB["Portal MVC\nIIS local"]
+    WEB --> LOGIN["Login\nusuarios.txt"]
+    LOGIN --> CAL["Calendario\nfechas con carpeta"]
+    CAL --> DASH["Dashboard\nprocesados / pendientes"]
+    DASH --> TAB["Tabla por fila\nCódigo barras + Ver PDF"]
+    TAB --> ACT{"Acción"}
+    ACT -->|"Procesar lote"| API1["API 1 + API 2"]
+    API1 -->|"APIs suben PDF"| S3[("AWS S3")]
+    API1 -->|"Éxito local"| MOV["NAS · procesados\nLog +1 / -1 nop"]
+    API1 -->|"Error API"| TAB
+    ACT -->|"Eliminar"| MOD["Modal confirmación"]
+    MOD --> DEL["Borrar PDF\nLog -1 nop"]
+    DEL --> TAB
+    MOV --> DONE(["Documento resuelto"])
+
+    style NOP fill:#9b2c2c,color:#fff
+    style WEB fill:#c05621,color:#fff
+    style S3 fill:#c53030,color:#fff
+    style DONE fill:#276749,color:#fff
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       5. EXPERIENCIA USUARIO LR
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>6. Experiencia del usuario — qué ve y qué no ve</h2>
+    <p class="sub">Diseñado para ser transparente: escanear y continuar trabajando</p>
+    <div class="mermaid">
+flowchart LR
+    U(["Operador"]) --> S["Escanea documento"]
+    S --> H["✅ Proceso automático\n(invisible)"]
+    H --> Q{"¿Quedó en\nnoprocesados?"}
+    Q -->|"No"| OK(["✅ Fin\nSin acción"])
+    Q -->|"Sí"| P["Abre portal IIS"]
+    P --> R["Corrige código\no elimina PDF"]
+    R --> OK
+
+    style U fill:#553c9a,color:#fff
+    style H fill:#276749,color:#fff
+    style OK fill:#2b6cb0,color:#fff
+    style P fill:#c05621,color:#fff
+    style Q fill:#744210,color:#fff
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       6. MAPA DE CONEXIONES LR (resumen red)
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>7. Mapa de conexiones de red</h2>
+    <p class="sub">Quién se conecta a qué — vista simplificada izquierda → derecha</p>
+    <div class="mermaid">
+flowchart LR
+    PC["PC usuario\nWorker 1"] -->|"SMB/UNC"| NAS["NAS\n\\\\192.168.0.69\\ArchivosScaneados"]
+    SRV["Servidor\n10.0.0.3\nWorker 2"] -->|"SMB/UNC\nlee TXT + PDF"| NAS
+    IIS["Servidor local\nIIS · MVC"] -->|"SMB/UNC\nlee/escribe noprocesados"| NAS
+    SRV -->|"HTTPS"| API["APIs Helpharma"]
+    IIS -->|"HTTPS"| API
+    API -->|"Upload"| S3[("AWS S3")]
+    SRV -.->|"SMTP"| MAIL["Correo\nOffice 365"]
+    BROWSER["Navegador\nusuario"] -->|"HTTP/S"| IIS
+
+    style PC fill:#553c9a,color:#fff
+    style NAS fill:#2b6cb0,color:#fff
+    style SRV fill:#276749,color:#fff
+    style IIS fill:#c05621,color:#fff
+    style S3 fill:#c53030,color:#fff
+    style MAIL fill:#2c5282,color:#fff
+    </div>
+    <div class="note">
+      <strong>S3:</strong> destino de los PDF procesados exitosamente a través del Endpoint 2 (soporte físico).
+      El Worker 2 y el MVC no escriben directamente en S3; la carga la realiza la API Helpharma.
+    </div>
+  </div>
+
+  <footer>
+    Helpharma · WorkerHelpharmaSubirMasivos · diagrama-flujo-sistema-completo.html · 2026-06-04
+  </footer>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    flowchart: {
+      curve: 'basis',
+      padding: 18,
+      htmlLabels: true,
+      rankSpacing: 48,
+      nodeSpacing: 32
+    },
+    securityLevel: 'loose'
+  });
+</script>
+</body>
+</html>
