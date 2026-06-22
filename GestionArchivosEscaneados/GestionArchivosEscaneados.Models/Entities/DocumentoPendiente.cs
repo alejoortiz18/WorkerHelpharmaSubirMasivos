@@ -1,12 +1,8 @@
 namespace GestionArchivosEscaneados.Models.Entities;
 
-public class ArchivoNoProcesado
+public class DocumentoPendiente
 {
     public required string NombreArchivo { get; init; }
-
-    public required string Fecha { get; init; }
-
-    public required string RutaCompleta { get; init; }
 
     public bool TieneIntentoPrevio { get; init; }
 }

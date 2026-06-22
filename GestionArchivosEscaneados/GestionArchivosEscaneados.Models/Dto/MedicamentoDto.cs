@@ -9,4 +9,8 @@ public class MedicamentoDto
     public string? nombre { get; set; }
 
     public int cantidad { get; set; }
+
+    public string? lote { get; set; }
+
+    public decimal valorMx { get; set; }
 }

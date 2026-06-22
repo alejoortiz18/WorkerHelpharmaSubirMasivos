@@ -39,6 +39,10 @@ public class NoProcesadosViewModel
 
     public string? ArchivoSeleccionado { get; set; }
 
+    public int TotalConIntentoPrevio { get; set; }
+
+    public int TotalPendientesReproceso { get; set; }
+
     public string? MensajeExito { get; set; }
 
     public string? MensajeError { get; set; }
@@ -55,6 +59,8 @@ public class ArchivoNoProcesadoItemViewModel
     public string CodigoBarras { get; set; } = string.Empty;
 
     public bool ErrorProceso { get; set; }
+
+    public bool TieneIntentoPrevio { get; set; }
 }
 
 public class ProcesarLoteRequest
@@ -64,6 +70,13 @@ public class ProcesarLoteRequest
     public string? ArchivoSeleccionado { get; set; }
 
     public List<ArchivoNoProcesadoItemViewModel> Archivos { get; set; } = [];
+}
+
+public class ReprocesarDocumentoRequest
+{
+    public string Fecha { get; set; } = string.Empty;
+
+    public string NombreArchivo { get; set; } = string.Empty;
 }
 
 public class EliminarDocumentoRequest

@@ -33,101 +33,91 @@ public static class RutasDiaHelper
 public class UncStorageService
 {
     private readonly RutasSettings _rutas;
+    private readonly UncConexionService _uncConexion;
 
-    public UncStorageService(IOptions<RutasSettings> rutas)
+    public UncStorageService(IOptions<RutasSettings> rutas, UncConexionService uncConexion)
     {
         _rutas = rutas.Value;
-    }
-
-    public IReadOnlyList<string> ListarFechasDisponibles(string usuario)
-    {
-        var carpetaUsuario = _rutas.CarpetaUsuario(usuario);
-        if (!Directory.Exists(carpetaUsuario))
-            return [];
-
-        return Directory.GetDirectories(carpetaUsuario)
-            .Select(Path.GetFileName)
-            .Where(n => n != null && RutasDiaHelper.EsFechaValida(n))
-            .Cast<string>()
-            .OrderByDescending(f => f, StringComparer.Ordinal)
-            .ToList();
-    }
-
-    public bool ExisteCarpetaDia(string usuario, string fecha)
-    {
-        if (!RutasDiaHelper.EsFechaValida(fecha))
-            return false;
-
-        return Directory.Exists(Path.Combine(_rutas.CarpetaUsuario(usuario), fecha));
+        _uncConexion = uncConexion;
     }
 
     public RutasDiaContext ObtenerRutasDia(string usuario, string fecha) =>
         RutasDiaHelper.Resolver(_rutas, usuario, fecha);
 
-    public IReadOnlyList<ArchivoNoProcesado> ListarNoProcesados(string usuario, string fecha)
-    {
-        var rutas = ObtenerRutasDia(usuario, fecha);
-        if (!Directory.Exists(rutas.Noprocesados))
-            return [];
+    public IReadOnlyList<ArchivoNoProcesado> ListarNoProcesados(string usuario, string fecha) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var rutas = ObtenerRutasDia(usuario, fecha);
+            if (!Directory.Exists(rutas.Noprocesados))
+                return (IReadOnlyList<ArchivoNoProcesado>)[];
 
-        return Directory.GetFiles(rutas.Noprocesados, "*.pdf")
-            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-            .Select(f => new ArchivoNoProcesado
+            return Directory.GetFiles(rutas.Noprocesados, "*.pdf")
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .Select(f => new ArchivoNoProcesado
+                {
+                    NombreArchivo = Path.GetFileName(f),
+                    Fecha = fecha,
+                    RutaCompleta = f,
+                    TieneIntentoPrevio = File.Exists(ObtenerRutaIntentoPrevio(f))
+                })
+                .ToList();
+        });
+
+    public string? ResolverRutaPdfSegura(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            if (string.IsNullOrWhiteSpace(nombreArchivo) ||
+                nombreArchivo.Contains("..") ||
+                nombreArchivo.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                return null;
+
+            var rutas = ObtenerRutasDia(usuario, fecha);
+            var ruta = Path.Combine(rutas.Noprocesados, nombreArchivo);
+            return File.Exists(ruta) ? ruta : null;
+        });
+
+    public byte[]? LeerPdfNoProcesado(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var ruta = ResolverRutaPdfSeguraInterno(usuario, fecha, nombreArchivo);
+            return ruta == null ? null : File.ReadAllBytes(ruta);
+        });
+
+    public void MoverANoprocesadosAProcesados(string rutaOrigen, RutasDiaContext rutas) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            Directory.CreateDirectory(rutas.Procesados);
+
+            var nombre = Path.GetFileName(rutaOrigen);
+            var destino = Path.Combine(rutas.Procesados, nombre);
+            var rutaNoprocesados = Path.Combine(rutas.Noprocesados, nombre);
+
+            if (File.Exists(destino))
+                File.Delete(destino);
+
+            var origen = File.Exists(rutaOrigen)
+                ? rutaOrigen
+                : File.Exists(rutaNoprocesados)
+                    ? rutaNoprocesados
+                    : null;
+
+            if (origen == null)
+                return;
+
+            try
             {
-                NombreArchivo = Path.GetFileName(f),
-                Fecha = fecha,
-                RutaCompleta = f
-            })
-            .ToList();
-    }
+                File.Move(origen, destino);
+            }
+            catch (IOException)
+            {
+                var bytes = File.ReadAllBytes(origen);
+                File.WriteAllBytes(destino, bytes);
+                EliminarArchivoConReintentos(origen);
+            }
 
-    public string? ResolverRutaPdfSegura(string usuario, string fecha, string nombreArchivo)
-    {
-        if (string.IsNullOrWhiteSpace(nombreArchivo) ||
-            nombreArchivo.Contains("..") ||
-            nombreArchivo.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-            return null;
-
-        var rutas = ObtenerRutasDia(usuario, fecha);
-        var ruta = Path.Combine(rutas.Noprocesados, nombreArchivo);
-        return File.Exists(ruta) ? ruta : null;
-    }
-
-    public void MoverANoprocesadosAProcesados(string rutaOrigen, RutasDiaContext rutas)
-    {
-        Directory.CreateDirectory(rutas.Procesados);
-
-        var nombre = Path.GetFileName(rutaOrigen);
-        var destino = Path.Combine(rutas.Procesados, nombre);
-        var rutaNoprocesados = Path.Combine(rutas.Noprocesados, nombre);
-
-        if (File.Exists(destino))
-            File.Delete(destino);
-
-        var origen = File.Exists(rutaOrigen)
-            ? rutaOrigen
-            : File.Exists(rutaNoprocesados)
-                ? rutaNoprocesados
-                : null;
-
-        if (origen == null)
-            return;
-
-        try
-        {
-            File.Move(origen, destino);
-        }
-        catch (IOException)
-        {
-            // El visor PDF puede mantener el archivo abierto en UNC; copiar y eliminar por separado.
-            var bytes = File.ReadAllBytes(origen);
-            File.WriteAllBytes(destino, bytes);
-            EliminarArchivoConReintentos(origen);
-        }
-
-        if (File.Exists(rutaNoprocesados))
-            EliminarArchivoConReintentos(rutaNoprocesados);
-    }
+            if (File.Exists(rutaNoprocesados))
+                EliminarArchivoConReintentos(rutaNoprocesados);
+        });
 
     private static void EliminarArchivoConReintentos(string ruta, int intentos = 8, int esperaMs = 250)
     {
@@ -151,13 +141,66 @@ public class UncStorageService
             throw new IOException($"No se pudo eliminar el archivo de noprocesados: {ruta}");
     }
 
-    public bool EliminarPdfNoProcesado(string usuario, string fecha, string nombreArchivo)
-    {
-        var ruta = ResolverRutaPdfSegura(usuario, fecha, nombreArchivo);
-        if (ruta == null)
-            return false;
+    public bool EliminarPdfNoProcesado(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var ruta = ResolverRutaPdfSeguraInterno(usuario, fecha, nombreArchivo);
+            if (ruta == null)
+                return false;
 
-        File.Delete(ruta);
-        return true;
+            EliminarMarcadorIntentoPrevio(ruta);
+            File.Delete(ruta);
+            return true;
+        });
+
+    public bool ExisteIntentoPrevio(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var ruta = ResolverRutaPdfSeguraInterno(usuario, fecha, nombreArchivo);
+            return ruta != null && File.Exists(ObtenerRutaIntentoPrevio(ruta));
+        });
+
+    public void MarcarIntentoPrevio(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var ruta = ResolverRutaPdfSeguraInterno(usuario, fecha, nombreArchivo);
+            if (ruta == null)
+                return;
+
+            var marcador = ObtenerRutaIntentoPrevio(ruta);
+            Directory.CreateDirectory(Path.GetDirectoryName(marcador)!);
+            File.WriteAllText(marcador, DateTime.UtcNow.ToString("O"));
+        });
+
+    public void EliminarMarcadorIntentoPrevio(string usuario, string fecha, string nombreArchivo) =>
+        _uncConexion.EjecutarConAcceso(() =>
+        {
+            var ruta = ResolverRutaPdfSeguraInterno(usuario, fecha, nombreArchivo);
+            if (ruta == null)
+                return;
+
+            EliminarMarcadorIntentoPrevio(ruta);
+        });
+
+    private string? ResolverRutaPdfSeguraInterno(string usuario, string fecha, string nombreArchivo)
+    {
+        if (string.IsNullOrWhiteSpace(nombreArchivo) ||
+            nombreArchivo.Contains("..") ||
+            nombreArchivo.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            return null;
+
+        var rutas = ObtenerRutasDia(usuario, fecha);
+        var ruta = Path.Combine(rutas.Noprocesados, nombreArchivo);
+        return File.Exists(ruta) ? ruta : null;
+    }
+
+    private static string ObtenerRutaIntentoPrevio(string rutaPdf) =>
+        Path.Combine(Path.GetDirectoryName(rutaPdf)!, Path.GetFileName(rutaPdf) + ".attempt");
+
+    private static void EliminarMarcadorIntentoPrevio(string rutaPdf)
+    {
+        var marcador = ObtenerRutaIntentoPrevio(rutaPdf);
+        if (File.Exists(marcador))
+            File.Delete(marcador);
     }
 }

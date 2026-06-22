@@ -1,46 +1,58 @@
-using GestionArchivosEscaneados.Models.Settings;
+using GestionArchivosEscaneados.Models.Dto;
+using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace GestionArchivosEscaneados.Infrastructure.Auth;
 
 public class UsuarioAuthService
 {
-    private readonly RutasSettings _rutas;
+    private const string OrigenValidacion = "dbo.Usuarios.NombreUsuario";
+    private readonly ITrazabilidadConsultaSqlService _trazabilidad;
     private readonly ILogger<UsuarioAuthService> _logger;
 
-    public UsuarioAuthService(IOptions<RutasSettings> rutas, ILogger<UsuarioAuthService> logger)
+    public UsuarioAuthService(
+        ITrazabilidadConsultaSqlService trazabilidad,
+        ILogger<UsuarioAuthService> logger)
     {
-        _rutas = rutas.Value;
+        _trazabilidad = trazabilidad;
         _logger = logger;
     }
 
-    public async Task<string?> ValidarYObtenerUsuarioNormalizadoAsync(
+    public async Task<ValidacionLoginResult> ValidarLoginAsync(
         string usuarioIngresado,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(usuarioIngresado))
-            return null;
+            return ValidacionLoginResult.NoRegistrado(OrigenValidacion);
 
-        var ruta = _rutas.RutaArchivoUsuarios;
-        if (string.IsNullOrWhiteSpace(ruta) || !File.Exists(ruta))
+        var ingresoNormalizado = UsuarioNormalizador.NormalizarIngreso(usuarioIngresado);
+        if (string.IsNullOrWhiteSpace(ingresoNormalizado))
+            return ValidacionLoginResult.NoRegistrado(OrigenValidacion);
+
+        try
         {
-            _logger.LogWarning("UsuariosTxtNoEncontrado | Ruta={Ruta}", ruta);
-            return null;
+            var existe = await _trazabilidad.UsuarioExisteAsync(ingresoNormalizado, cancellationToken);
+            if (existe)
+            {
+                _logger.LogInformation(
+                    "LoginExitoso | Usuario={Usuario} | Ingreso={Ingreso}",
+                    ingresoNormalizado,
+                    usuarioIngresado.Trim());
+                return ValidacionLoginResult.Ok(ingresoNormalizado, OrigenValidacion);
+            }
+
+            _logger.LogWarning(
+                "UsuarioNoRegistrado | Ingreso={Ingreso} | Normalizado={Normalizado} | Origen={Origen}",
+                usuarioIngresado.Trim(),
+                ingresoNormalizado,
+                OrigenValidacion);
+
+            return ValidacionLoginResult.NoRegistrado(OrigenValidacion);
         }
-
-        var ingresoUpper = usuarioIngresado.Trim().ToUpperInvariant();
-        var lineas = await File.ReadAllLinesAsync(ruta, cancellationToken);
-
-        foreach (var linea in lineas)
+        catch (Exception ex)
         {
-            if (string.IsNullOrWhiteSpace(linea))
-                continue;
-
-            if (string.Equals(linea.Trim().ToUpperInvariant(), ingresoUpper, StringComparison.Ordinal))
-                return linea.Trim().ToLowerInvariant();
+            _logger.LogError(ex, "LoginFalloBaseDatos | Origen={Origen}", OrigenValidacion);
+            return ValidacionLoginResult.BaseDatosNoDisponible(OrigenValidacion);
         }
-
-        return null;
     }
 }

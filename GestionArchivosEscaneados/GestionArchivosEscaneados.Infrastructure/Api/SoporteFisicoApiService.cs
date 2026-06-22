@@ -13,6 +13,7 @@ public class SoporteFisicoApiService
     private readonly HttpClient _httpClient;
     private readonly ILogger<SoporteFisicoApiService> _logger;
     private readonly string _token;
+    private readonly string _idUsuario;
 
     public SoporteFisicoApiService(
         HttpClient httpClient,
@@ -22,21 +23,21 @@ public class SoporteFisicoApiService
         _httpClient = httpClient;
         _logger = logger;
         _token = credenciales.Value.SoporteFisicoToken;
+        _idUsuario = credenciales.Value.IdUsuario;
     }
 
     public async Task<bool> EnviarSoporteFisicoAsync(
         string soporte,
-        string rutaArchivo,
+        byte[] contenidoPdf,
+        string nombreArchivo,
         SoporteResponseDto data,
         string idUsuario)
     {
         try
         {
-            var idConvenio = int.TryParse(data.IdConvenio, out var parsed) ? parsed : 0;
-
             using var form = new MultipartFormDataContent();
             form.Add(new StringContent(soporte), "soporte");
-            form.Add(new StringContent(idConvenio.ToString()), "idConvenio");
+            form.Add(new StringContent(NormalizarIdConvenio(data.IdConvenio)), "idConvenio");
             form.Add(new StringContent(data.NombreConvenio ?? ""), "nombreConvenio");
             form.Add(new StringContent(data.Fecha.ToString("yyyy-MM-dd HH:mm:ss")), "fecha");
             form.Add(new StringContent(data.IdBodega ?? ""), "idBodega");
@@ -53,16 +54,18 @@ public class SoporteFisicoApiService
             form.Add(new StringContent(data.Direccion ?? ""), "direccion");
             form.Add(new StringContent(data.Complemento ?? ""), "complemento");
             form.Add(new StringContent(data.Observacion ?? ""), "observacion");
+            form.Add(new StringContent(""), "reclamante");
+            form.Add(new StringContent(""), "idReclamante");
             form.Add(new StringContent(data.ValorCM ?? "0"), "valorCM");
-            form.Add(new StringContent(idUsuario), "idUsuario");
+            var idUsuarioEnvio = string.IsNullOrWhiteSpace(_idUsuario) ? idUsuario : _idUsuario;
+            form.Add(new StringContent(idUsuarioEnvio), "idUsuario");
 
             var medicamentosJson = JsonSerializer.Serialize(data.medicamentos ?? []);
             form.Add(new StringContent(medicamentosJson, Encoding.UTF8, "application/json"), "medicamentos");
 
-            var fileBytes = await File.ReadAllBytesAsync(rutaArchivo);
-            var fileContent = new ByteArrayContent(fileBytes);
+            var fileContent = new ByteArrayContent(contenidoPdf);
             fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-            form.Add(fileContent, "anexo", Path.GetFileName(rutaArchivo));
+            form.Add(fileContent, "anexo", nombreArchivo);
 
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
@@ -93,5 +96,16 @@ public class SoporteFisicoApiService
             _logger.LogError(ex, "SoporteFisicoException | Soporte={Soporte}", soporte);
             return false;
         }
+    }
+
+    private static string NormalizarIdConvenio(string? idConvenio)
+    {
+        if (string.IsNullOrWhiteSpace(idConvenio))
+            return string.Empty;
+
+        var limpio = idConvenio.Trim();
+        return int.TryParse(limpio, out var numero)
+            ? numero.ToString()
+            : limpio;
     }
 }

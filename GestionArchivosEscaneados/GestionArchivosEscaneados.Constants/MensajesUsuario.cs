@@ -5,8 +5,20 @@ public static class MensajesUsuario
     public const string UsuarioNoRegistrado =
         "No ha subido archivos al sistema.\nEn caso de dudas contacte al administrador.";
 
+    public const string BaseDatosNoAccesible =
+        "No se puede acceder a la base de datos de trazabilidad.\nVerifique la conexion o contacte al administrador.";
+
     public const string DocumentoNoEncontrado =
-        "No se encontró información del documento.\nContacta con el administrador.";
+        "No se encontro informacion del documento.\nContacta con el administrador.";
+
+    public const string ErrorEnvioSoporteFisico =
+        "Se encontro informacion del documento, pero fallo el envio al sistema de soporte fisico.\nContacta con el administrador.";
+
+    public const string ErrorLecturaBarcode =
+        "No se pudo identificar un codigo de barras valido para el documento.\nVerifica el codigo o contacta con el administrador.";
+
+    public const string ErrorOpenAi =
+        "No se pudo completar la lectura automatica del documento.\nIntenta nuevamente o contacta con el administrador.";
 
     public const string FechaNoDisponible =
         "La fecha seleccionada no existe en el sistema.";
@@ -21,10 +33,10 @@ public static class MensajesUsuario
         "{0} documento(s) procesado(s). {1} documento(s) con error.";
 
     public const string ReprocesoLoteSinCodigos =
-        "Ingrese al menos un código de barras para procesar.";
+        "No hay documentos disponibles para reprocesar.";
 
     public const string ConfirmarEliminacionDocumento =
-        "¿Está seguro de eliminar este documento?\nEsta acción no se puede deshacer.";
+        "Esta seguro de eliminar este documento?\nEsta accion no se puede deshacer.";
 
     public const string EliminarExito =
         "Documento eliminado correctamente.";
@@ -33,5 +45,5 @@ public static class MensajesUsuario
         "No se pudo eliminar el documento.";
 
     public const string UsuarioRequerido =
-        "Debe iniciar sesión para continuar.";
+        "Debe iniciar sesion para continuar.";
 }

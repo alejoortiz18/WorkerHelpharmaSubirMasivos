@@ -1,0 +1,24 @@
+Portal MVC - despliegue IIS
+===========================
+
+1. Publicar (desde GestionArchivosEscaneados):
+   powershell -ExecutionPolicy Bypass -File .\scripts\publicar-mvc.ps1
+
+2. En IIS Manager (como administrador):
+   - Sitio "Gestion archivos escaneados" -> Ruta fisica debe apuntar a:
+     C:\Users\alejandro.ortiz\Documents\helpharma\Desarrollos\publicaciones\Soporte Masivos\MVC
+   - Application Pool -> Reciclar (o detener/iniciar sitio)
+
+3. Verificar configuracion:
+   - UNC en appsettings.json -> se usa para leer, servir y mover los PDF fisicos.
+   - TrazabilidadSql:ConnectionString -> se usa para login, calendario, conteos y actualizacion de documentos.
+
+4. Verificar arranque:
+   - Abrir logs\stdout_*.log
+   - Buscar: StartupPortal | UncAccesible=True
+   - Si falla la conexion SQL, el login no validara usuarios y el portal no mostrara fechas ni conteos.
+
+5. Probar login:
+   - El usuario debe existir en dbo.Usuarios.NombreUsuario de la base de datos Scaneados.
+
+Nota: appsettings.Production.local.json contiene claves sensibles y no debe subirse a git.

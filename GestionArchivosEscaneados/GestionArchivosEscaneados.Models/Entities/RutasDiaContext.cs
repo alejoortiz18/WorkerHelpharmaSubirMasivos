@@ -13,6 +13,4 @@ public class RutasDiaContext
     public required string Procesados { get; init; }
 
     public required string Log { get; init; }
-
-    public string RutaLogDiario => Path.Combine(Log, $"{Fecha}.txt");
 }

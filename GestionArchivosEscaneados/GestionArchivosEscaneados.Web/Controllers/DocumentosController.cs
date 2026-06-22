@@ -1,6 +1,8 @@
 using GestionArchivosEscaneados.Application;
 using GestionArchivosEscaneados.Constants;
+using GestionArchivosEscaneados.Models.Dto;
 using GestionArchivosEscaneados.Models.Entities;
+using GestionArchivosEscaneados.Models.Enums;
 using GestionArchivosEscaneados.Models.ViewModels;
 using GestionArchivosEscaneados.Web.Filters;
 using Microsoft.AspNetCore.Mvc;
@@ -34,10 +36,10 @@ public class DocumentosController : Controller
         });
     }
 
-    public IActionResult NoProcesados(string fecha, string? ver)
+    public async Task<IActionResult> NoProcesados(string fecha, string? ver, CancellationToken cancellationToken)
     {
         var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
-        var archivos = _reproceso.ListarNoProcesados(usuario, fecha);
+        var archivos = await _reproceso.ListarNoProcesadosAsync(usuario, fecha, cancellationToken);
         var seleccionado = ver ?? archivos.FirstOrDefault()?.NombreArchivo;
 
         var vm = CrearNoProcesadosViewModel(fecha, archivos, seleccionado);
@@ -54,11 +56,11 @@ public class DocumentosController : Controller
     public IActionResult Pdf(string fecha, string archivo)
     {
         var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
-        var ruta = _reproceso.ResolverRutaPdf(usuario, fecha, archivo);
-        if (ruta == null)
+        var contenido = _reproceso.LeerPdfNoProcesado(usuario, fecha, archivo);
+        if (contenido == null)
             return NotFound();
 
-        return PhysicalFile(ruta, "application/pdf", enableRangeProcessing: true);
+        return File(contenido, "application/pdf");
     }
 
     [HttpPost]
@@ -73,7 +75,7 @@ public class DocumentosController : Controller
 
         if (documentos.Count == 0)
         {
-            var archivosActuales = _reproceso.ListarNoProcesados(usuario, request.Fecha);
+            var archivosActuales = await _reproceso.ListarNoProcesadosAsync(usuario, request.Fecha, cancellationToken);
             return View("NoProcesados", CrearNoProcesadosViewModel(
                 request.Fecha,
                 archivosActuales,
@@ -82,11 +84,17 @@ public class DocumentosController : Controller
                 mensajeAdvertencia: MensajesUsuario.ReprocesoLoteSinCodigos));
         }
 
-        var resultados = await _reproceso.ReprocesarLoteAsync(
-            usuario,
-            request.Fecha,
-            documentos,
-            cancellationToken);
+        var resultados = new List<ReprocesoLoteItemResult>();
+        foreach (var (nombreArchivo, codigoBarras) in documentos)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            resultados.Add(await _reproceso.ProcesarItemAsync(
+                usuario,
+                request.Fecha,
+                nombreArchivo,
+                codigoBarras,
+                cancellationToken));
+        }
 
         var exitosos = resultados
             .Where(r => r.Exito)
@@ -97,7 +105,7 @@ public class DocumentosController : Controller
             .Where(r => !r.Exito)
             .ToDictionary(r => r.NombreArchivo, r => r.CodigoBarras, StringComparer.OrdinalIgnoreCase);
 
-        var archivosRestantes = _reproceso.ListarNoProcesados(usuario, request.Fecha)
+        var archivosRestantes = (await _reproceso.ListarNoProcesadosAsync(usuario, request.Fecha, cancellationToken))
             .Where(a => !exitosos.Contains(a.NombreArchivo))
             .ToList();
 
@@ -125,7 +133,7 @@ public class DocumentosController : Controller
         if (exitos > 0 && errores > 0)
             mensajeAdvertencia = string.Format(MensajesUsuario.ReprocesoLoteParcial, exitos, errores);
         else if (errores > 0)
-            mensajeError = MensajesUsuario.DocumentoNoEncontrado;
+            mensajeError = ResolverMensajeError(resultados);
 
         var seleccionado = request.ArchivoSeleccionado;
         if (!string.IsNullOrWhiteSpace(seleccionado) &&
@@ -142,6 +150,57 @@ public class DocumentosController : Controller
             MensajeExito = mensajeExito,
             MensajeError = mensajeError,
             MensajeAdvertencia = mensajeAdvertencia
+        });
+    }
+
+    private static string ResolverMensajeError(IReadOnlyCollection<ReprocesoLoteItemResult> resultados)
+    {
+        var estados = resultados
+            .Where(r => !r.Exito)
+            .Select(r => r.Estado)
+            .Distinct()
+            .ToList();
+
+        if (estados.Count == 1)
+        {
+            return estados[0] switch
+            {
+                SoporteProcesamientoEstado.FalloApiFisico => MensajesUsuario.ErrorEnvioSoporteFisico,
+                SoporteProcesamientoEstado.FalloBarcode => MensajesUsuario.ErrorLecturaBarcode,
+                SoporteProcesamientoEstado.FalloOpenAi => MensajesUsuario.ErrorOpenAi,
+                _ => MensajesUsuario.DocumentoNoEncontrado
+            };
+        }
+
+        return MensajesUsuario.DocumentoNoEncontrado;
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReprocesarDocumento(ReprocesarDocumentoRequest request, CancellationToken cancellationToken)
+    {
+        var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
+
+        if (string.IsNullOrWhiteSpace(request.NombreArchivo))
+        {
+            return BadRequest(new
+            {
+                exito = false,
+                estado = SoporteProcesamientoEstado.ErrorInesperado.ToString()
+            });
+        }
+
+        var estado = await _reproceso.ReprocesarAsync(
+            usuario,
+            request.Fecha,
+            request.NombreArchivo,
+            string.Empty,
+            cancellationToken);
+
+        return Json(new
+        {
+            exito = estado == SoporteProcesamientoEstado.Exito,
+            estado = estado.ToString()
         });
     }
 
@@ -185,6 +244,8 @@ public class DocumentosController : Controller
         {
             Fecha = fecha,
             ArchivoSeleccionado = seleccionado ?? archivos.FirstOrDefault()?.NombreArchivo,
+            TotalConIntentoPrevio = archivos.Count(a => a.TieneIntentoPrevio),
+            TotalPendientesReproceso = archivos.Count(a => !a.TieneIntentoPrevio),
             Archivos = archivos.Select(a =>
             {
                 ArchivoNoProcesadoItemViewModel? previo = null;
@@ -194,7 +255,8 @@ public class DocumentosController : Controller
                     NombreArchivo = a.NombreArchivo,
                     Fecha = a.Fecha,
                     CodigoBarras = previo?.CodigoBarras ?? string.Empty,
-                    ErrorProceso = previo?.ErrorProceso ?? false
+                    ErrorProceso = previo?.ErrorProceso ?? false,
+                    TieneIntentoPrevio = a.TieneIntentoPrevio || previo?.TieneIntentoPrevio == true
                 };
             }).ToList(),
             MensajeExito = mensajeExito,

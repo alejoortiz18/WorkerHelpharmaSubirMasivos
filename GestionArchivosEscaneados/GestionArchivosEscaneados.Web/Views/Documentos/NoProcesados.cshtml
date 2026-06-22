@@ -64,19 +64,28 @@
                                     {
                                         var archivo = Model.Archivos[i];
                                         var seleccionado = Model.ArchivoSeleccionado == archivo.NombreArchivo;
-                                        <tr class="docs-row @(seleccionado ? "is-selected" : "") @(archivo.ErrorProceso ? "has-error" : "")"
+                                        <tr class="docs-row @(seleccionado ? "is-selected" : "") @(archivo.ErrorProceso ? "has-error" : "") @(archivo.TieneIntentoPrevio ? "is-reprocessed" : "")"
                                             data-archivo="@archivo.NombreArchivo"
+                                            data-intento-previo="@(archivo.TieneIntentoPrevio.ToString().ToLowerInvariant())"
                                             data-pdf-url="@Url.Action("Pdf", new { fecha = Model.Fecha, archivo = archivo.NombreArchivo })">
                                             <td class="docs-col-file">
                                                 <input type="hidden" asp-for="Archivos[i].NombreArchivo" />
                                                 <input type="hidden" asp-for="Archivos[i].Fecha" />
-                                                <span class="docs-file-name" title="@archivo.NombreArchivo">@archivo.NombreArchivo</span>
+                                                <div class="docs-file-meta">
+                                                    <span class="docs-file-name" title="@archivo.NombreArchivo">@archivo.NombreArchivo</span>
+                                                    @if (archivo.TieneIntentoPrevio)
+                                                    {
+                                                        <span class="badge rounded-pill docs-badge-reprocessed" title="Este soporte ya fue reprocesado">
+                                                            Reprocesado
+                                                        </span>
+                                                    }
+                                                </div>
                                             </td>
                                             <td class="docs-col-date">
                                                 <span class="docs-date-pill">@archivo.Fecha</span>
                                             </td>
                                             <td class="docs-col-barcode">
-                                                <input asp-for="Archivos[i].CodigoBarras"
+                                               <input asp-for="Archivos[i].CodigoBarras"
                                                        class="form-control form-control-sm barcode-input"
                                                        autocomplete="off"
                                                        placeholder="Código Barras ej: ME-123"
@@ -113,14 +122,27 @@
                                 <span class="docs-ready-count">
                                     <strong id="countListos">0</strong> @GestionArchivosEscaneados.Constants.EtiquetasUi.ListosParaProcesar
                                 </span>
+                                <span class="text-muted small d-none" id="reprocessInlineStatus"></span>
                             </div>
-                            <button type="submit" class="btn btn-primary docs-btn-process" id="btnProcesar" disabled>
-                                @GestionArchivosEscaneados.Constants.EtiquetasUi.ProcesarLote
-                            </button>
+                            <div class="docs-footer-actions">
+                                <button type="button" class="btn btn-outline-primary" id="btnReprocesar" disabled>
+                                    Reprocesar
+                                </button>
+                                <button type="submit" class="btn btn-primary docs-btn-process" id="btnProcesar" disabled>
+                                    @GestionArchivosEscaneados.Constants.EtiquetasUi.ProcesarLote
+                                </button>
+                            </div>
                         </div>
                     }
                 </div>
             </form>
+            <div class="d-none mt-2" id="reprocessProgressCard">
+                <div class="small fw-semibold text-muted mb-1">Reproceso en curso</div>
+                <div class="progress" style="height: 18px;">
+                    <div class="progress-bar bg-success text-white fw-semibold" id="reprocessProgressBar" style="width: 0%">0/0</div>
+                </div>
+                <div class="text-muted small mt-1" id="reprocessProgressText">0/0</div>
+            </div>
         </div>
 
         <div class="col-xl-7">
@@ -183,14 +205,23 @@
 
             const hiddenSeleccionado = document.getElementById('archivoSeleccionado');
             const btnProcesar = document.getElementById('btnProcesar');
+            const btnReprocesar = document.getElementById('btnReprocesar');
+            const reprocessUrl = '@Url.Action("ReprocesarDocumento")';
             const countListos = document.getElementById('countListos');
+            const reprocessInlineStatus = document.getElementById('reprocessInlineStatus');
+            const progressCard = document.getElementById('reprocessProgressCard');
+            const progressText = document.getElementById('reprocessProgressText');
+            const progressBar = document.getElementById('reprocessProgressBar');
             const pdfFrame = document.getElementById('pdfFrame');
             const previewFileName = document.getElementById('previewFileName');
             const inputs = form.querySelectorAll('.barcode-input');
+            const rows = Array.from(form.querySelectorAll('.docs-row'));
 
             function countFilled() {
                 let n = 0;
-                inputs.forEach(i => { if (i.value.trim()) n++; });
+                inputs.forEach(i => {
+                    if (!i.disabled && i.value.trim()) n++;
+                });
                 return n;
             }
 
@@ -198,6 +229,48 @@
                 const n = countFilled();
                 countListos.textContent = n;
                 btnProcesar.disabled = n === 0;
+                btnReprocesar.disabled = rows.length === 0;
+            }
+
+            function updateProgress(done, total) {
+                if (!progressCard) return;
+                const texto = `${done}/${total}`;
+                progressText.textContent = `${done}/${total}`;
+                progressBar.textContent = texto;
+                progressBar.style.width = total > 0 ? `${Math.max(0, Math.min(100, (done / total) * 100))}%` : '0%';
+            }
+
+            async function reprocesarFila(row, index, total) {
+                const nombreArchivo = row.dataset.archivo ?? '';
+                if (!nombreArchivo) {
+                    return { skipped: true };
+                }
+
+                const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+                const payload = new FormData();
+                payload.append('__RequestVerificationToken', token);
+                payload.append('Fecha', document.querySelector('input[name="Fecha"]')?.value ?? '');
+                payload.append('NombreArchivo', nombreArchivo);
+
+                let response;
+                try {
+                    response = await fetch(reprocessUrl, {
+                        method: 'POST',
+                        body: payload
+                    });
+                } catch (error) {
+                    updateProgress(index, total);
+                    return { skipped: false, exito: false, estado: 'ErrorInesperado' };
+                }
+
+                if (!response.ok) {
+                    updateProgress(index, total);
+                    return { skipped: false, exito: false, estado: 'ErrorInesperado' };
+                }
+
+                const result = await response.json();
+                updateProgress(index, total);
+                return { skipped: false, estado: result.estado, exito: !!result.exito };
             }
 
             function selectRow(row, focusBarcode) {
@@ -263,6 +336,31 @@
                 });
             });
 
+            btnReprocesar?.addEventListener('click', async () => {
+                const reprocessRows = rows;
+                const total = reprocessRows.length;
+                if (total === 0) return;
+
+                btnReprocesar.disabled = true;
+                btnProcesar.disabled = true;
+                form.querySelectorAll('.barcode-input').forEach(input => input.disabled = true);
+                progressCard?.classList.remove('d-none');
+                if (reprocessInlineStatus) {
+                    reprocessInlineStatus.textContent = 'Procesando archivos...';
+                    reprocessInlineStatus.classList.remove('d-none');
+                }
+                updateProgress(0, total);
+
+                let done = 0;
+                for (const row of reprocessRows) {
+                    await reprocesarFila(row, done + 1, total);
+                    done++;
+                    updateProgress(done, total);
+                }
+
+                setTimeout(() => window.location.reload(), 500);
+            });
+
             inputs.forEach((input, idx) => {
                 input.addEventListener('input', updateProcessButton);
                 input.addEventListener('keydown', e => {
@@ -277,6 +375,9 @@
             });
 
             updateProcessButton();
+            if (progressCard) {
+                updateProgress(0, rows.filter(row => row.dataset.intentoPrevio !== 'true').length);
+            }
         })();
     </script>
 }

@@ -18,7 +18,7 @@ public class HomeController : Controller
     }
 
     [RequireUsuario]
-    public IActionResult Index(int? anio, int? mes, string? error)
+    public async Task<IActionResult> Index(int? anio, int? mes, string? error, CancellationToken cancellationToken)
     {
         var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
         var hoy = DateTime.Today;
@@ -28,7 +28,7 @@ public class HomeController : Controller
         if (mesSel < 1) { mesSel = 12; anioSel--; }
         if (mesSel > 12) { mesSel = 1; anioSel++; }
 
-        var fechas = _calendario.ObtenerFechasDisponibles(usuario);
+        var fechas = await _calendario.ObtenerFechasDisponiblesAsync(usuario, cancellationToken);
 
         return View(new CalendarioViewModel
         {
@@ -43,12 +43,12 @@ public class HomeController : Controller
     [HttpPost]
     [ValidateAntiForgeryToken]
     [RequireUsuario]
-    public IActionResult SeleccionarFecha(int anio, int mes, int dia)
+    public async Task<IActionResult> SeleccionarFecha(int anio, int mes, int dia, CancellationToken cancellationToken)
     {
         var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
         var fecha = new DateTime(anio, mes, dia).ToString("yyyy-MM-dd");
 
-        if (!_calendario.FechaExiste(usuario, fecha))
+        if (!await _calendario.FechaExisteAsync(usuario, fecha, cancellationToken))
         {
             return RedirectToAction(nameof(Index), new
             {

@@ -124,6 +124,18 @@ html, body {
     font-weight: 600;
 }
 
+.docs-row.is-reprocessed {
+    background: #f8fbff;
+}
+
+.docs-row.is-reprocessed > td {
+    border-bottom-color: #e2e8f0;
+}
+
+.docs-row.is-reprocessed .docs-file-name {
+    color: #1d4ed8;
+}
+
 .docs-row.has-error.is-selected > td {
     background-color: #ffe4e6 !important;
     border-top-color: #fecdd3;
@@ -192,6 +204,23 @@ html, body {
     white-space: nowrap;
 }
 
+.docs-file-meta {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-width: 0;
+}
+
+.docs-badge-reprocessed {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    flex: 0 0 auto;
+}
+
 .docs-date-pill {
     display: inline-block;
     font-size: .75rem;
@@ -222,9 +251,22 @@ html, body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
     gap: 1rem;
     padding: 1rem 1.25rem;
     border-top: 1px solid #eef2f7;
+}
+
+.docs-footer-actions {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+.docs-footer-actions .btn {
+    white-space: nowrap;
 }
 
 .docs-ready-count {
@@ -264,6 +306,38 @@ html, body {
 @media (min-width: 1400px) {
     .app-main {
         max-width: 1480px;
+    }
+}
+
+@media (max-width: 768px) {
+    .docs-table-footer {
+        align-items: stretch;
+    }
+
+    .docs-footer-actions {
+        width: 100%;
+        justify-content: stretch;
+        margin-left: 0;
+    }
+
+    .docs-footer-actions .btn {
+        flex: 1 1 12rem;
+    }
+}
+
+@media (max-width: 1399.98px) {
+    .docs-table-footer {
+        align-items: stretch;
+    }
+
+    .docs-footer-actions {
+        width: 100%;
+        justify-content: stretch;
+        margin-left: 0;
+    }
+
+    .docs-footer-actions .btn {
+        flex: 1 1 10rem;
     }
 }
 

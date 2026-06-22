@@ -4,7 +4,17 @@ using Microsoft.Extensions.Logging;
 
 namespace GestionArchivosEscaneados.Infrastructure.Api;
 
-public class SoporteProcesamientoService
+public interface ISoporteProcesamientoService
+{
+    Task<SoporteProcesamientoResult> ProcesarAsync(
+        string soporte,
+        byte[] contenidoPdf,
+        string nombreArchivo,
+        string idUsuario,
+        CancellationToken cancellationToken = default);
+}
+
+public class SoporteProcesamientoService : ISoporteProcesamientoService
 {
     private readonly SoporteApiService _soporteApi;
     private readonly SoporteFisicoApiService _soporteFisicoApi;
@@ -22,27 +32,32 @@ public class SoporteProcesamientoService
 
     public async Task<SoporteProcesamientoResult> ProcesarAsync(
         string soporte,
-        string rutaArchivoPdf,
+        byte[] contenidoPdf,
+        string nombreArchivo,
         string idUsuario,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var respuesta = await _soporteApi.EnviarSoporteAsync(soporte);
+        var soporteConsulta = soporte.Trim();
+        var soporteNormalizado = NormalizarSoporte(soporteConsulta);
+
+        var respuesta = await _soporteApi.EnviarSoporteAsync(soporteConsulta);
         if (respuesta == null)
         {
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiDatos,
-                Soporte = soporte
+                Soporte = soporteNormalizado
             };
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
         var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-            soporte,
-            rutaArchivoPdf,
+            soporteNormalizado,
+            contenidoPdf,
+            nombreArchivo,
             respuesta,
             idUsuario);
 
@@ -51,21 +66,28 @@ public class SoporteProcesamientoService
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiFisico,
-                Soporte = soporte,
+                Soporte = soporteNormalizado,
                 Datos = respuesta
             };
         }
 
         _logger.LogInformation(
             "SoporteProcesamientoOK | Soporte={Soporte} | Usuario={Usuario}",
-            soporte,
+            soporteConsulta,
             idUsuario);
 
         return new SoporteProcesamientoResult
         {
             Estado = SoporteProcesamientoEstado.Exito,
-            Soporte = soporte,
+            Soporte = soporteNormalizado,
             Datos = respuesta
         };
+    }
+
+    private static string NormalizarSoporte(string soporte)
+    {
+        return string.IsNullOrWhiteSpace(soporte)
+            ? string.Empty
+            : soporte.Trim().Replace("-", string.Empty).Replace(" ", string.Empty);
     }
 }

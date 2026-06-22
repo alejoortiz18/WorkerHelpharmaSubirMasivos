@@ -4,5 +4,9 @@ public enum SoporteProcesamientoEstado
 {
     Exito,
     FalloApiDatos,
-    FalloApiFisico
+    FalloApiFisico,
+    FalloBarcode,
+    PdfCorrupto,
+    FalloOpenAi,
+    ErrorInesperado
 }

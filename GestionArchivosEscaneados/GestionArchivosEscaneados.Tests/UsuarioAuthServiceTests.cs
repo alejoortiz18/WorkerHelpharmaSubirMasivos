@@ -1,8 +1,9 @@
 using FluentAssertions;
 using GestionArchivosEscaneados.Infrastructure.Auth;
-using GestionArchivosEscaneados.Models.Settings;
+using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
+using GestionArchivosEscaneados.Models.Dto;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using NSubstitute;
 
 namespace GestionArchivosEscaneados.Tests;
 
@@ -11,23 +12,58 @@ public class UsuarioAuthServiceTests
     [Fact]
     public async Task Login_AceptaEquivalenciaUppercase()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "gae-auth-" + Guid.NewGuid().ToString("N"));
-        var usuariosDir = Path.Combine(dir, "Usuarios");
-        Directory.CreateDirectory(usuariosDir);
-        await File.WriteAllTextAsync(Path.Combine(usuariosDir, "usuarios.txt"), "alejandro.ortiz\n");
+        var service = CrearServicioConUsuarios("alejandro.ortiz");
 
-        var rutas = new RutasSettings
-        {
-            RaizUnc = dir,
-            CarpetaUsuarios = "Usuarios",
-            ArchivoUsuarios = "usuarios.txt"
-        };
+        var resultado = await service.ValidarLoginAsync("ALEJANDRO.ORTIZ");
 
-        var service = new UsuarioAuthService(Options.Create(rutas), NullLogger<UsuarioAuthService>.Instance);
+        resultado.Estado.Should().Be(ValidacionLoginEstado.Exito);
+        resultado.UsuarioNormalizado.Should().Be("alejandro.ortiz");
+    }
 
-        var resultado = await service.ValidarYObtenerUsuarioNormalizadoAsync("ALEJANDRO.ORTIZ");
-        resultado.Should().Be("alejandro.ortiz");
+    [Fact]
+    public async Task Login_AceptaCorreoComoWorker1()
+    {
+        var service = CrearServicioConUsuarios("alejandro.ortiz");
 
-        Directory.Delete(dir, true);
+        var resultado = await service.ValidarLoginAsync("alejandro.ortiz@zentria.com.co");
+
+        resultado.Estado.Should().Be(ValidacionLoginEstado.Exito);
+        resultado.UsuarioNormalizado.Should().Be("alejandro.ortiz");
+    }
+
+    [Fact]
+    public async Task Login_AceptaDominioBarraUsuario()
+    {
+        var service = CrearServicioConUsuarios("alejandro.ortiz");
+
+        var resultado = await service.ValidarLoginAsync(@"ZENTRIA\alejandro.ortiz");
+
+        resultado.Estado.Should().Be(ValidacionLoginEstado.Exito);
+        resultado.UsuarioNormalizado.Should().Be("alejandro.ortiz");
+    }
+
+    [Fact]
+    public async Task Login_UsuarioInexistente_RetornaNoRegistrado()
+    {
+        var service = CrearServicioConUsuarios("alejandro.ortiz");
+
+        var resultado = await service.ValidarLoginAsync("otro.usuario");
+
+        resultado.Estado.Should().Be(ValidacionLoginEstado.UsuarioNoRegistrado);
+    }
+
+    private static UsuarioAuthService CrearServicioConUsuarios(params string[] usuarios)
+    {
+        var trazabilidad = Substitute.For<ITrazabilidadConsultaSqlService>();
+        trazabilidad.UsuarioExisteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var usuario = callInfo.Arg<string>().Trim();
+                return usuarios.Contains(usuario, StringComparer.OrdinalIgnoreCase);
+            });
+
+        return new UsuarioAuthService(
+            trazabilidad,
+            NullLogger<UsuarioAuthService>.Instance);
     }
 }

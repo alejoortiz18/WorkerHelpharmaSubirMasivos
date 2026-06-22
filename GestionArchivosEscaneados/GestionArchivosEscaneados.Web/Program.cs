@@ -1,8 +1,15 @@
+using Microsoft.Extensions.FileProviders;
 using GestionArchivosEscaneados.Application;
 using GestionArchivosEscaneados.Infrastructure;
+using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
 using GestionArchivosEscaneados.Models.Settings;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
+builder.Configuration.AddUserSecrets<Program>(optional: true);
 
 builder.Services.AddControllersWithViews();
 
@@ -20,6 +27,22 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var rutas = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RutasSettings>>().Value;
+    var unc = scope.ServiceProvider.GetRequiredService<GestionArchivosEscaneados.Infrastructure.Unc.UncConexionService>();
+    var trazabilidad = scope.ServiceProvider.GetRequiredService<ITrazabilidadConsultaSqlService>();
+    var accesible = unc.AsegurarAccesoUnc();
+    await trazabilidad.EnsureSchemaAsync();
+    logger.LogInformation(
+        "StartupPortal | RaizUnc={RaizUnc} | UncAccesible={Accesible} | UsaCredenciales={UsaCredenciales} | Entorno={Entorno}",
+        rutas.RaizUnc,
+        accesible,
+        unc.UsaCredenciales,
+        app.Environment.EnvironmentName);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -27,6 +50,10 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
+});
 app.UseRouting();
 app.UseSession();
 app.UseAuthorization();
