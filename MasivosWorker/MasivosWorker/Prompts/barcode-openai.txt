@@ -1,0 +1,10 @@
+Lee el documento PDF adjunto completo.
+
+Tu tarea: localizar el código de barras principal e identificar el texto legible impreso justo DEBAJO de ese código de barras.
+
+Reglas estrictas:
+- NO leas las barras del código de barras; solo el texto humano visible debajo.
+- Elimina caracteres especiales visibles (por ejemplo *).
+- Responde UNA sola línea con ese texto, sin explicaciones.
+- Si hay letras y números (ejemplo: KI-434411 o FBO79606), devuelve el texto tal como se ve debajo del barcode, sin asteriscos.
+- Si no hay código de barras visible o no puedes leer el texto debajo con certeza, responde exactamente: NO_BARCODE
