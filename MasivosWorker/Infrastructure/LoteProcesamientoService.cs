@@ -9,7 +9,7 @@ namespace Infrastructure;
 /// <summary>
 /// Orquesta el ciclo completo de un lote (TXT) en UNC (RF-01 a RF-12).
 /// </summary>
-public class LoteProcesamientoService
+public class LoteProcesamientoService : ILoteProcesamientoService
 {
     private readonly FileManagerInfraestructure _fileManager;
     private readonly IDocumentoProcesamientoService _documentoProcesamiento;

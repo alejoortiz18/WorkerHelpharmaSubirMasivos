@@ -176,6 +176,8 @@ public static class Worker2IntegracionHelper
                 Options.Create(red),
                 NullLogger<RedDisponibleService>.Instance),
             loteProcesamiento,
+            new RegistroUsuariosEnProcesoService(
+                NullLogger<RegistroUsuariosEnProcesoService>.Instance),
             NullLogger<LoteWatcherInfrastructure>.Instance);
     }
 

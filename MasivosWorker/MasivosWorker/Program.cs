@@ -47,8 +47,11 @@ builder.Services.AddSingleton<LogDiarioService>();
 builder.Services.AddSingleton<DocumentoProcesamientoService>();
 builder.Services.AddSingleton<IDocumentoProcesamientoService>(sp =>
     sp.GetRequiredService<DocumentoProcesamientoService>());
+builder.Services.AddSingleton<RegistroUsuariosEnProcesoService>();
 builder.Services.AddSingleton<LoteWatcherInfrastructure>();
 builder.Services.AddSingleton<LoteProcesamientoService>();
+builder.Services.AddSingleton<ILoteProcesamientoService>(sp =>
+    sp.GetRequiredService<LoteProcesamientoService>());
 builder.Services.AddSingleton<ITrazabilidadSqlService, TrazabilidadSqlService>();
 builder.Services.AddSingleton<BarcodeRegionService>();
 builder.Services.AddSingleton<EmailNotificationService>();
