@@ -1,10 +1,14 @@
 Lee el documento PDF adjunto completo.
 
-Tu tarea: localizar el código de barras principal e identificar el texto legible impreso justo DEBAJO de ese código de barras.
+Tu tarea: localizar el código de barras del SOPORTE/FACTURA e identificar el texto legible impreso justo DEBAJO de ese código de barras.
+
+El código de soporte SIEMPRE empieza con una o más LETRAS seguidas de números (ejemplos: FE249758, KI434411, FBO79606, KV351697).
 
 Reglas estrictas:
+- Devuelve ÚNICAMENTE el código que tenga prefijo de letras seguido de números.
+- IGNORA por completo los códigos de barras que sean solo números (por ejemplo el NIT de la empresa como 900277244 o 9002772444). Esos NO son el soporte.
+- Si hay varios códigos de barras, elige el que tenga letras al inicio; nunca el numérico.
 - NO leas las barras del código de barras; solo el texto humano visible debajo.
-- Elimina caracteres especiales visibles (por ejemplo *).
-- Responde UNA sola línea con ese texto, sin explicaciones.
-- Si hay letras y números (ejemplo: KI-434411 o FBO79606), devuelve el texto tal como se ve debajo del barcode, sin asteriscos.
-- Si no hay código de barras visible o no puedes leer el texto debajo con certeza, responde exactamente: NO_BARCODE
+- Elimina caracteres especiales visibles (por ejemplo * o -).
+- Responde UNA sola línea con ese texto, sin explicaciones ni espacios.
+- Si no hay ningún código con prefijo de letras visible o no puedes leerlo con certeza, responde exactamente: NO_BARCODE

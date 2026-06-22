@@ -418,3 +418,11 @@ FodyWeavers.xsd
 *.msp
 GestionArchivosEscaneados/tmp-portal-home.png
 GestionArchivosEscaneados/tmp-visual-no-procesados-2.png
+
+# Local configuration overrides (contain secrets: API keys, credentials)
+appsettings.local.json
+appsettings.*.local.json
+!appsettings.Production.local.example.json
+
+# Documentos de prueba escaneados (pueden contener datos de pacientes)
+ArchivosTest/
