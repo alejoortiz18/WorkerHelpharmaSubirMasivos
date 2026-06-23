@@ -14,6 +14,8 @@ public class DocumentoProcesamientoResult
 
     public string? IdCartera { get; init; }
 
+    public DateTime? FechaFactura { get; init; }
+
     public bool EsExitoso => Estado == DocumentoProcesamientoEstado.Exito;
 }
 

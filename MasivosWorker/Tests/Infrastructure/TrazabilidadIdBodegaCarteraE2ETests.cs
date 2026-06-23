@@ -57,6 +57,12 @@ public class TrazabilidadIdBodegaCarteraE2ETests
 
         await LimpiarRegistroAsync(connectionString, usuario, fecha, nombrePdf);
 
+        var trazabilidad = new TrazabilidadSqlService(
+            Options.Create(Worker2IntegracionHelper.Config.GetSection("TrazabilidadSql").Get<TrazabilidadSqlSettings>()
+                ?? new TrazabilidadSqlSettings()),
+            NullLogger<TrazabilidadSqlService>.Instance);
+        await trazabilidad.EnsureSchemaAsync(CancellationToken.None);
+
         var raiz = Path.Combine(Path.GetTempPath(), "e2e-idbodega-real-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -79,12 +85,15 @@ public class TrazabilidadIdBodegaCarteraE2ETests
             registro.Value.IdCartera.Should().NotBeNullOrWhiteSpace("IdCartera real no debe quedar vacío");
             registro.Value.IdBodega.Should().Be(soporteReal.UltimosDatos!.IdBodega);
             registro.Value.IdCartera.Should().Be(soporteReal.UltimosDatos!.IdCartera);
+            registro.Value.FechaFactura.Should().NotBeNull("FechaFactura real no debe quedar vacía");
+            registro.Value.FechaFactura.Should().Be(soporteReal.UltimosDatos!.Fecha);
             registro.Value.Procesado.Should().BeTrue();
 
             // Evidencia visible en la salida del test.
             Console.WriteLine(
                 $"[REAL] Pdf={nombrePdf} Soporte={soporteReal.UltimoCodigo} " +
                 $"IdBodega={registro.Value.IdBodega} IdCartera={registro.Value.IdCartera} " +
+                $"FechaFactura={registro.Value.FechaFactura:yyyy-MM-dd HH:mm:ss} " +
                 $"IdPaciente={registro.Value.IdPaciente} Paciente={soporteReal.UltimosDatos!.NombrePaciente}");
         }
         finally
@@ -185,11 +194,11 @@ public class TrazabilidadIdBodegaCarteraE2ETests
         throw new FileNotFoundException($"No se encontró ArchivosTest\\{nombre} subiendo desde {AppContext.BaseDirectory}");
     }
 
-    private static async Task<(string? IdBodega, string? IdCartera, int? IdPaciente, bool Procesado)?> LeerRegistroAsync(
+    private static async Task<(string? IdBodega, string? IdCartera, DateTime? FechaFactura, int? IdPaciente, bool Procesado)?> LeerRegistroAsync(
         string connectionString, string usuario, string fecha, string nombreArchivo)
     {
         const string sql = """
-SELECT TOP 1 dp.IdBodega, dp.IdCartera, dp.IdPaciente, dp.Procesado
+SELECT TOP 1 dp.IdBodega, dp.IdCartera, dp.FechaFactura, dp.IdPaciente, dp.Procesado
 FROM dbo.DocumentosProcesados dp
 INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
 INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
@@ -212,8 +221,9 @@ WHERE u.NombreUsuario = @Usuario AND fp.FechaProcesamiento = @Fecha AND dp.Nombr
         return (
             reader.IsDBNull(0) ? null : reader.GetString(0),
             reader.IsDBNull(1) ? null : reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetInt32(2),
-            !reader.IsDBNull(3) && reader.GetBoolean(3));
+            reader.IsDBNull(2) ? null : reader.GetDateTime(2),
+            reader.IsDBNull(3) ? null : reader.GetInt32(3),
+            !reader.IsDBNull(4) && reader.GetBoolean(4));
     }
 
     private static async Task LimpiarRegistroAsync(

@@ -17,6 +17,7 @@ public interface ITrazabilidadSqlService
         int? idPaciente,
         string? idBodega,
         string? idCartera,
+        DateTime? fechaFactura,
         bool procesado,
         CancellationToken cancellationToken = default);
 }
@@ -76,6 +77,7 @@ BEGIN
         IdPaciente int NULL,
         IdBodega nvarchar(100) NULL,
         IdCartera nvarchar(100) NULL,
+        FechaFactura datetime2(0) NULL,
         Procesado bit NOT NULL,
         FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_DocumentosProcesados_FechaCreacion DEFAULT (sysdatetime()),
         CONSTRAINT FK_DocumentosProcesados_FechasProcesamiento FOREIGN KEY (FechaProcesamientoId) REFERENCES dbo.FechasProcesamiento(FechaProcesamientoId)
@@ -90,6 +92,9 @@ IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdBodega') IS NULL
 
 IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdCartera') IS NULL
     ALTER TABLE dbo.DocumentosProcesados ADD IdCartera nvarchar(100) NULL;
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'FechaFactura') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD FechaFactura datetime2(0) NULL;
 
 ;WITH Duplicados AS
 (
@@ -180,6 +185,7 @@ BEGIN
         @IdPaciente int = NULL,
         @IdBodega nvarchar(100) = NULL,
         @IdCartera nvarchar(100) = NULL,
+        @FechaFactura datetime2(0) = NULL,
         @Procesado bit
     AS
     BEGIN
@@ -222,6 +228,7 @@ BEGIN
             IdPaciente = COALESCE(@IdPaciente, IdPaciente),
             IdBodega = COALESCE(@IdBodega, IdBodega),
             IdCartera = COALESCE(@IdCartera, IdCartera),
+            FechaFactura = COALESCE(@FechaFactura, FechaFactura),
             Procesado = CASE WHEN @Procesado = 1 THEN 1 ELSE Procesado END
         WHERE FechaProcesamientoId = @FechaId
           AND NombreArchivo = @NombreArchivo;
@@ -236,6 +243,7 @@ BEGIN
                 IdPaciente,
                 IdBodega,
                 IdCartera,
+                FechaFactura,
                 Procesado
             )
             VALUES
@@ -246,6 +254,7 @@ BEGIN
                 @IdPaciente,
                 @IdBodega,
                 @IdCartera,
+                @FechaFactura,
                 @Procesado
             );
         END
@@ -265,6 +274,7 @@ END
         int? idPaciente,
         string? idBodega,
         string? idCartera,
+        DateTime? fechaFactura,
         bool procesado,
         CancellationToken cancellationToken = default)
     {
@@ -308,6 +318,7 @@ SET
     IdPaciente = COALESCE(@IdPaciente, IdPaciente),
     IdBodega = COALESCE(@IdBodega, IdBodega),
     IdCartera = COALESCE(@IdCartera, IdCartera),
+    FechaFactura = COALESCE(@FechaFactura, FechaFactura),
     Procesado = CASE WHEN @Procesado = 1 THEN 1 ELSE Procesado END
 WHERE FechaProcesamientoId = @FechaId
   AND NombreArchivo = @NombreArchivo;
@@ -322,6 +333,7 @@ BEGIN
         IdPaciente,
         IdBodega,
         IdCartera,
+        FechaFactura,
         Procesado
     )
     VALUES
@@ -332,6 +344,7 @@ BEGIN
         @IdPaciente,
         @IdBodega,
         @IdCartera,
+        @FechaFactura,
         @Procesado
     );
 END
@@ -351,11 +364,12 @@ COMMIT TRAN;
                 command.Parameters.Add("@IdPaciente", System.Data.SqlDbType.Int).Value = (object?)idPaciente ?? DBNull.Value;
                 command.Parameters.Add("@IdBodega", System.Data.SqlDbType.NVarChar, 100).Value = (object?)idBodega ?? DBNull.Value;
                 command.Parameters.Add("@IdCartera", System.Data.SqlDbType.NVarChar, 100).Value = (object?)idCartera ?? DBNull.Value;
+                command.Parameters.Add("@FechaFactura", System.Data.SqlDbType.DateTime2).Value = (object?)fechaFactura ?? DBNull.Value;
                 command.Parameters.Add("@Procesado", System.Data.SqlDbType.Bit).Value = procesado;
             });
 
             _logger.LogInformation(
-                "TrazabilidadDocumentoRegistrada | Usuario={Usuario} | Fecha={Fecha} | Archivo={Archivo} | Soporte={Soporte} | IdPaciente={IdPaciente} | IdBodega={IdBodega} | IdCartera={IdCartera} | Procesado={Procesado}",
+                "TrazabilidadDocumentoRegistrada | Usuario={Usuario} | Fecha={Fecha} | Archivo={Archivo} | Soporte={Soporte} | IdPaciente={IdPaciente} | IdBodega={IdBodega} | IdCartera={IdCartera} | FechaFactura={FechaFactura} | Procesado={Procesado}",
                 contexto.Usuario,
                 contexto.Fecha,
                 nombreArchivo,
@@ -363,6 +377,7 @@ COMMIT TRAN;
                 idPaciente?.ToString() ?? "(null)",
                 idBodega ?? "(null)",
                 idCartera ?? "(null)",
+                fechaFactura?.ToString("yyyy-MM-dd HH:mm:ss") ?? "(null)",
                 procesado);
         }
         catch (SqlException ex)

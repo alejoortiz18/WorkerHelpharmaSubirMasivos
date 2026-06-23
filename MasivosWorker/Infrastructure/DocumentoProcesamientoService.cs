@@ -97,7 +97,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                     Soporte = soporte,
                     IdPaciente = resultado.Datos?.IdPaciente,
                     IdBodega = resultado.Datos?.IdBodega,
-                    IdCartera = resultado.Datos?.IdCartera
+                    IdCartera = resultado.Datos?.IdCartera,
+                    FechaFactura = resultado.Datos?.Fecha
                 };
             }
 
@@ -108,7 +109,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Soporte = soporte,
                 IdPaciente = resultado.Datos?.IdPaciente,
                 IdBodega = resultado.Datos?.IdBodega,
-                IdCartera = resultado.Datos?.IdCartera
+                IdCartera = resultado.Datos?.IdCartera,
+                FechaFactura = resultado.Datos?.Fecha
             };
         }
         catch (OperationCanceledException)
@@ -156,7 +158,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Soporte = soporte,
                 IdPaciente = resultado.Datos?.IdPaciente,
                 IdBodega = resultado.Datos?.IdBodega,
-                IdCartera = resultado.Datos?.IdCartera
+                IdCartera = resultado.Datos?.IdCartera,
+                FechaFactura = resultado.Datos?.Fecha
             },
             _ => new DocumentoProcesamientoResult
             {
@@ -165,7 +168,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Soporte = soporte,
                 IdPaciente = resultado.Datos?.IdPaciente,
                 IdBodega = resultado.Datos?.IdBodega,
-                IdCartera = resultado.Datos?.IdCartera
+                IdCartera = resultado.Datos?.IdCartera,
+                FechaFactura = resultado.Datos?.Fecha
             }
         };
     }
@@ -192,7 +196,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Soporte = soporteConsulta,
                 IdPaciente = resultado.Datos?.IdPaciente,
                 IdBodega = resultado.Datos?.IdBodega,
-                IdCartera = resultado.Datos?.IdCartera
+                IdCartera = resultado.Datos?.IdCartera,
+                FechaFactura = resultado.Datos?.Fecha
             },
             _ => new DocumentoProcesamientoResult
             {
@@ -200,7 +205,8 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Soporte = soporteConsulta,
                 IdPaciente = resultado.Datos?.IdPaciente,
                 IdBodega = resultado.Datos?.IdBodega,
-                IdCartera = resultado.Datos?.IdCartera
+                IdCartera = resultado.Datos?.IdCartera,
+                FechaFactura = resultado.Datos?.Fecha
             }
         };
     }

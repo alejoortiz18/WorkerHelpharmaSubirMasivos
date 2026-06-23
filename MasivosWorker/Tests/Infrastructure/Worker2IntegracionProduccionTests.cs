@@ -361,6 +361,7 @@ public class Worker2IntegracionProduccionTests
             idPaciente: null,
             idBodega: null,
             idCartera: null,
+            fechaFactura: null,
             procesado: false,
             CancellationToken.None);
 
@@ -371,6 +372,7 @@ public class Worker2IntegracionProduccionTests
             idPaciente: 30233836,
             idBodega: "12",
             idCartera: "34",
+            fechaFactura: new DateTime(2026, 6, 4),
             procesado: true,
             CancellationToken.None);
 

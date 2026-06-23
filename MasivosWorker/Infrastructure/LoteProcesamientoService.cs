@@ -490,6 +490,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
             resultado.IdPaciente,
             resultado.IdBodega,
             resultado.IdCartera,
+            resultado.FechaFactura,
             procesado,
             cancellationToken);
     }

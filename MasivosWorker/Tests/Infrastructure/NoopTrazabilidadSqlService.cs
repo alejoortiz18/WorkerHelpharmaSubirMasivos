@@ -15,6 +15,7 @@ internal sealed class NoopTrazabilidadSqlService : ITrazabilidadSqlService
         int? idPaciente,
         string? idBodega,
         string? idCartera,
+        DateTime? fechaFactura,
         bool procesado,
         CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
