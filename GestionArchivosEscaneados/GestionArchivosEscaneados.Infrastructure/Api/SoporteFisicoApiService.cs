@@ -35,8 +35,9 @@ public class SoporteFisicoApiService
     {
         try
         {
+            var soporteNormalizado = NormalizarSoporte(soporte);
             using var form = new MultipartFormDataContent();
-            form.Add(new StringContent(soporte), "soporte");
+            form.Add(new StringContent(soporteNormalizado), "soporte");
             form.Add(new StringContent(NormalizarIdConvenio(data.IdConvenio)), "idConvenio");
             form.Add(new StringContent(data.NombreConvenio ?? ""), "nombreConvenio");
             form.Add(new StringContent(data.Fecha.ToString("yyyy-MM-dd HH:mm:ss")), "fecha");
@@ -80,13 +81,13 @@ public class SoporteFisicoApiService
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("SoporteFisicoOK | Soporte={Soporte}", soporte);
+                _logger.LogInformation("SoporteFisicoOK | Soporte={Soporte}", soporteNormalizado);
                 return true;
             }
 
             _logger.LogError(
                 "SoporteFisicoError | Soporte={Soporte} | Status={Status} | Respuesta={Respuesta}",
-                soporte,
+                soporteNormalizado,
                 response.StatusCode,
                 contenido);
             return false;
@@ -97,6 +98,10 @@ public class SoporteFisicoApiService
             return false;
         }
     }
+
+    private static string NormalizarSoporte(string soporte) =>
+        soporte.Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal);
 
     private static string NormalizarIdConvenio(string? idConvenio)
     {

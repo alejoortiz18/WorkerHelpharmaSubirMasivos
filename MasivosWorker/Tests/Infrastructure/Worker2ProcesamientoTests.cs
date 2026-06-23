@@ -192,7 +192,7 @@ public class Worker2ProcesamientoTests
             .Returns(FalloBarcode());
         documento.ProcesarConCodigoConocidoAsync(
                 Arg.Any<string>(),
-                Arg.Any<DocumentoProcesadoDto>(),
+                Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(Exito("KV111111"));
 
@@ -272,7 +272,7 @@ public class Worker2ProcesamientoTests
             .Returns(FalloBarcode());
         documento.ProcesarConCodigoConocidoAsync(
                 Arg.Any<string>(),
-                Arg.Any<DocumentoProcesadoDto>(),
+                Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(Exito("KV222222"));
 

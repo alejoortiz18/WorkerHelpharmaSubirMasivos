@@ -170,6 +170,41 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
         };
     }
 
+    public async Task<DocumentoProcesamientoResult> ProcesarConCodigoConocidoAsync(
+        string rutaPdf,
+        string soporte,
+        CancellationToken cancellationToken = default)
+    {
+        var soporteConsulta = soporte.Trim();
+        var resultado = await _soporteProcesamiento.ProcesarAsync(soporteConsulta, rutaPdf, cancellationToken);
+
+        return resultado.Estado switch
+        {
+            SoporteProcesamientoEstado.FalloApiDatos => new DocumentoProcesamientoResult
+            {
+                Estado = DocumentoProcesamientoEstado.FalloApiDatos,
+                Soporte = soporteConsulta,
+                IdPaciente = null
+            },
+            SoporteProcesamientoEstado.FalloApiFisico => new DocumentoProcesamientoResult
+            {
+                Estado = DocumentoProcesamientoEstado.FalloApiFisico,
+                Soporte = soporteConsulta,
+                IdPaciente = resultado.Datos?.IdPaciente,
+                IdBodega = resultado.Datos?.IdBodega,
+                IdCartera = resultado.Datos?.IdCartera
+            },
+            _ => new DocumentoProcesamientoResult
+            {
+                Estado = DocumentoProcesamientoEstado.Exito,
+                Soporte = soporteConsulta,
+                IdPaciente = resultado.Datos?.IdPaciente,
+                IdBodega = resultado.Datos?.IdBodega,
+                IdCartera = resultado.Datos?.IdCartera
+            }
+        };
+    }
+
     private async Task<DocumentoProcesadoDto?> ProcesarConReintentos(
         string ruta,
         string nombreArchivo,

@@ -36,6 +36,8 @@ public interface ITrazabilidadConsultaSqlService
         string nombreArchivo,
         string? soporte,
         int? idPaciente,
+        string? idBodega,
+        string? idCartera,
         CancellationToken cancellationToken = default);
 
     Task<bool> EliminarDocumentoPendienteAsync(
@@ -111,6 +113,8 @@ BEGIN
         NombreArchivo nvarchar(260) NOT NULL,
         Soporte nvarchar(100) NULL,
         IdPaciente int NULL,
+        IdBodega nvarchar(100) NULL,
+        IdCartera nvarchar(100) NULL,
         Procesado bit NOT NULL,
         FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_DocumentosProcesados_FechaCreacion DEFAULT (sysdatetime()),
         CONSTRAINT FK_DocumentosProcesados_FechasProcesamiento FOREIGN KEY (FechaProcesamientoId) REFERENCES dbo.FechasProcesamiento(FechaProcesamientoId)
@@ -119,6 +123,12 @@ BEGIN
     CREATE INDEX IX_DocumentosProcesados_FechaProcesamientoId
         ON dbo.DocumentosProcesados (FechaProcesamientoId);
 END
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdBodega') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD IdBodega nvarchar(100) NULL;
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdCartera') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD IdCartera nvarchar(100) NULL;
 
 IF OBJECT_ID(N'dbo.Configuraciones', N'U') IS NULL
 BEGIN
@@ -375,6 +385,8 @@ WHERE u.NombreUsuario = @NombreUsuario
         string nombreArchivo,
         string? soporte,
         int? idPaciente,
+        string? idBodega,
+        string? idCartera,
         CancellationToken cancellationToken = default)
     {
         const string sql = """
@@ -382,6 +394,8 @@ UPDATE dp
 SET
     dp.Soporte = @Soporte,
     dp.IdPaciente = @IdPaciente,
+    dp.IdBodega = @IdBodega,
+    dp.IdCartera = @IdCartera,
     dp.Procesado = 1
 FROM dbo.DocumentosProcesados dp
 INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
@@ -406,6 +420,10 @@ WHERE u.NombreUsuario = @NombreUsuario
                     (object?)soporte ?? DBNull.Value;
                 command.Parameters.Add("@IdPaciente", System.Data.SqlDbType.Int).Value =
                     (object?)idPaciente ?? DBNull.Value;
+                command.Parameters.Add("@IdBodega", System.Data.SqlDbType.NVarChar, 100).Value =
+                    (object?)idBodega ?? DBNull.Value;
+                command.Parameters.Add("@IdCartera", System.Data.SqlDbType.NVarChar, 100).Value =
+                    (object?)idCartera ?? DBNull.Value;
             });
 
         if (affected <= 0)

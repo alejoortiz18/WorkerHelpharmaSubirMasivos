@@ -14,11 +14,12 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 {
     private const string DefaultPrompt =
         "Analiza el PDF adjunto y devuelve únicamente el código de barras del documento.\n" +
-        "Responde solo con una cadena alfanumérica en formato LETRAS+NÚMEROS, sin espacios, sin guiones y sin explicación.\n" +
+        "Respeta el formato original del soporte. Si el texto visible tiene guion, devuélvelo con guion. Si no tiene guion, devuélvelo sin guion.\n" +
+        "Responde solo con el código del soporte, sin espacios y sin explicación.\n" +
         "Si no puedes identificar un código válido, responde exactamente NO_BARCODE.";
 
     private static readonly Regex CodigoValido =
-        new(@"^([A-Z]+)(\d+)$", RegexOptions.Compiled);
+        new(@"^([A-Z]+)-?(\d+)$", RegexOptions.Compiled);
 
     private readonly HttpClient _httpClient;
     private readonly OpenAiSettings _settings;
@@ -139,7 +140,6 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
         var codigo = limpio
             .Replace(" ", string.Empty, StringComparison.Ordinal)
-            .Replace("-", string.Empty, StringComparison.Ordinal)
             .Replace("*", string.Empty, StringComparison.Ordinal)
             .ToUpperInvariant();
 

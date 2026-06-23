@@ -24,10 +24,10 @@ public class SoporteApiService
     {
         try
         {
-            var soporteNormalizado = NormalizarSoporte(soporte);
+            var soporteConsulta = soporte.Trim();
             var body = new
             {
-                soporte = soporteNormalizado
+                soporte = soporteConsulta
             };
 
             var json = JsonSerializer.Serialize(body);
@@ -53,7 +53,7 @@ public class SoporteApiService
 
                 _logger.LogInformation(
                     "ApiSoporteOK | Soporte={Soporte} | Paciente={Paciente}",
-                    soporteNormalizado,
+                    soporteConsulta,
                     resultado?.NombrePaciente
                 );
 
@@ -63,7 +63,7 @@ public class SoporteApiService
             {
                 _logger.LogError(
                     "ApiSoporteError | Soporte={Soporte} | Status={Status} | Respuesta={Respuesta}",
-                    soporteNormalizado,
+                    soporteConsulta,
                     response.StatusCode,
                     contenido
                 );
@@ -83,6 +83,4 @@ public class SoporteApiService
         }
     }
 
-    private static string NormalizarSoporte(string soporte) =>
-        soporte.Replace("-", string.Empty);
 }

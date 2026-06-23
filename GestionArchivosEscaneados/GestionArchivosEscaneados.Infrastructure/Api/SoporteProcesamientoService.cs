@@ -40,7 +40,6 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         cancellationToken.ThrowIfCancellationRequested();
 
         var soporteConsulta = soporte.Trim();
-        var soporteNormalizado = NormalizarSoporte(soporteConsulta);
 
         var respuesta = await _soporteApi.EnviarSoporteAsync(soporteConsulta);
         if (respuesta == null)
@@ -48,14 +47,14 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiDatos,
-                Soporte = soporteNormalizado
+                Soporte = soporteConsulta
             };
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
         var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-            soporteNormalizado,
+            soporteConsulta,
             contenidoPdf,
             nombreArchivo,
             respuesta,
@@ -66,7 +65,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiFisico,
-                Soporte = soporteNormalizado,
+                Soporte = soporteConsulta,
                 Datos = respuesta
             };
         }
@@ -79,15 +78,8 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         return new SoporteProcesamientoResult
         {
             Estado = SoporteProcesamientoEstado.Exito,
-            Soporte = soporteNormalizado,
+            Soporte = soporteConsulta,
             Datos = respuesta
         };
-    }
-
-    private static string NormalizarSoporte(string soporte)
-    {
-        return string.IsNullOrWhiteSpace(soporte)
-            ? string.Empty
-            : soporte.Trim().Replace("-", string.Empty).Replace(" ", string.Empty);
     }
 }

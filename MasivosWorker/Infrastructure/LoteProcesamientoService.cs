@@ -402,7 +402,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                 {
                     resultado = await _documentoProcesamiento.ProcesarConCodigoConocidoAsync(
                         rutaPdf,
-                        openAi.Documento!,
+                        openAi.Codigo!,
                         cancellationToken);
 
                     if (resultado.EsExitoso)

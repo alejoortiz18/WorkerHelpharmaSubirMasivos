@@ -28,8 +28,8 @@ public class SoporteApiService
     {
         try
         {
-            var soporteNormalizado = NormalizarSoporte(soporte);
-            var json = JsonSerializer.Serialize(new { soporte = soporteNormalizado });
+            var soporteConsulta = soporte.Trim();
+            var json = JsonSerializer.Serialize(new { soporte = soporteConsulta });
             using var request = new HttpRequestMessage(
                 HttpMethod.Post,
                 "https://api-soportes.helpharma.com.co/api/DocSoporte/soportes/DatosSoportes");
@@ -44,7 +44,7 @@ public class SoporteApiService
             {
                 _logger.LogError(
                     "ApiSoporteError | Soporte={Soporte} | Status={Status}",
-                    soporteNormalizado,
+                    soporteConsulta,
                     response.StatusCode);
                 return null;
             }
@@ -59,7 +59,4 @@ public class SoporteApiService
         }
     }
 
-    private static string NormalizarSoporte(string soporte) =>
-        soporte.Replace("-", string.Empty, StringComparison.Ordinal)
-            .Replace(" ", string.Empty, StringComparison.Ordinal);
 }

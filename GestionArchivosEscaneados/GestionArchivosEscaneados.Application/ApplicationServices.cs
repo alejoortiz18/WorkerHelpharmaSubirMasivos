@@ -184,6 +184,8 @@ public class ReprocesoAppService
             nombreArchivo,
             resultado.Soporte,
             resultado.Datos?.IdPaciente,
+            resultado.Datos?.IdBodega,
+            resultado.Datos?.IdCartera,
             cancellationToken);
         if (!actualizado)
             return SoporteProcesamientoEstado.ErrorInesperado;
@@ -297,6 +299,8 @@ public class ReprocesoAppService
             nombreArchivo,
             resultado.Soporte,
             resultado.Datos?.IdPaciente,
+            resultado.Datos?.IdBodega,
+            resultado.Datos?.IdCartera,
             cancellationToken);
         if (!actualizado)
             return SoporteProcesamientoEstado.ErrorInesperado;

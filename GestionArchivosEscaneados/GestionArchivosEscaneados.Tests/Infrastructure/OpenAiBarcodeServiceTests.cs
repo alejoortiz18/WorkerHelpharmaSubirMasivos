@@ -6,7 +6,7 @@ namespace GestionArchivosEscaneados.Tests.Infrastructure;
 public class OpenAiBarcodeServiceTests
 {
     [Theory]
-    [InlineData("ME-123", "ME123")]
+    [InlineData("ME-123", "ME-123")]
     [InlineData("me 123", "ME123")]
     [InlineData("ME123", "ME123")]
     public void InterpretarRespuesta_NormalizaCodigoValido(string respuesta, string esperado)

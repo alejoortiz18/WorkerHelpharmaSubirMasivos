@@ -8,10 +8,10 @@ namespace Tests.Infrastructure;
 public class OpenAiBarcodeServiceTests
 {
     [Theory]
-    [InlineData("KI-470549", "KI", "470549", "KI470549")]
-    [InlineData("KE-470554", "KE", "470554", "KE470554")]
+    [InlineData("KI-470549", "KI", "470549", "KI-470549")]
+    [InlineData("KE-470554", "KE", "470554", "KE-470554")]
     [InlineData("FBO79606", "FBO", "79606", "FBO79606")]
-    [InlineData("*KI-434411*", "KI", "434411", "KI434411")]
+    [InlineData("*KI-434411*", "KI", "434411", "KI-434411")]
     [InlineData("NO_BARCODE", null, null, null)]
     [InlineData("texto invalido", null, null, null)]
     public void InterpretarRespuesta_NormalizaCodigoBajoBarcode(

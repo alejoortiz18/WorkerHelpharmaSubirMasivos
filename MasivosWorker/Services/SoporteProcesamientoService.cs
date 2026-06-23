@@ -37,28 +37,28 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var soporteNormalizado = NormalizarSoporte(soporte);
+        var soporteConsulta = soporte.Trim();
 
-        var respuesta = await _soporteApi.EnviarSoporteAsync(soporteNormalizado);
+        var respuesta = await _soporteApi.EnviarSoporteAsync(soporteConsulta);
 
         if (respuesta == null)
         {
             _logger.LogError(
                 "FalloApiDatos | Soporte={Soporte} | Ruta={Ruta}",
-                soporteNormalizado,
+                soporteConsulta,
                 rutaArchivoPdf);
 
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiDatos,
-                Soporte = soporteNormalizado
+                Soporte = soporteConsulta
             };
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
         var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-            soporteNormalizado,
+            soporteConsulta,
             rutaArchivoPdf,
             respuesta);
 
@@ -66,30 +66,27 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         {
             _logger.LogError(
                 "FalloApiFisico | Soporte={Soporte} | Ruta={Ruta}",
-                soporteNormalizado,
+                soporteConsulta,
                 rutaArchivoPdf);
 
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiFisico,
-                Soporte = soporteNormalizado,
+                Soporte = soporteConsulta,
                 Datos = respuesta
             };
         }
 
         _logger.LogInformation(
             "SoporteProcesamientoOK | Soporte={Soporte} | Paciente={Paciente}",
-            soporteNormalizado,
+            soporteConsulta,
             respuesta.NombrePaciente);
 
         return new SoporteProcesamientoResult
         {
             Estado = SoporteProcesamientoEstado.Exito,
-            Soporte = soporteNormalizado,
+            Soporte = soporteConsulta,
             Datos = respuesta
         };
     }
-
-    private static string NormalizarSoporte(string soporte) =>
-        soporte.Replace("-", string.Empty);
 }

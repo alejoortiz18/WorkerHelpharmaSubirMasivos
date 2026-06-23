@@ -12,4 +12,9 @@ public interface IDocumentoProcesamientoService
         string rutaPdf,
         DocumentoProcesadoDto documento,
         CancellationToken cancellationToken = default);
+
+    Task<DocumentoProcesamientoResult> ProcesarConCodigoConocidoAsync(
+        string rutaPdf,
+        string soporte,
+        CancellationToken cancellationToken = default);
 }

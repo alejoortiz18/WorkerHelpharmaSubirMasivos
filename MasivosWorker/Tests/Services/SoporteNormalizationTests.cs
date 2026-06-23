@@ -13,7 +13,7 @@ namespace Tests.Services;
 public class SoporteNormalizationTests
 {
     [Fact]
-    public async Task EnviarSoporteAsync_QuitaGuionesAntesDeEnviar()
+    public async Task EnviarSoporteAsync_ConservaGuionesAntesDeEnviar()
     {
         var handler = new CaptureHandler(async _ =>
             new HttpResponseMessage(HttpStatusCode.OK)
@@ -31,8 +31,7 @@ public class SoporteNormalizationTests
 
         handler.LastRequest.Should().NotBeNull();
         var body = await handler.LastRequest!.Content!.ReadAsStringAsync();
-        body.Should().Contain("\"soporte\":\"D11523229\"");
-        body.Should().NotContain("D1-1523229");
+        body.Should().Contain("\"soporte\":\"D1-1523229\"");
     }
 
     [Fact]

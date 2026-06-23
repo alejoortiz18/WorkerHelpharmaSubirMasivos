@@ -12,7 +12,7 @@ namespace Services;
 public class OpenAiBarcodeService : IOpenAiBarcodeService
 {
     private static readonly Regex CodigoValido =
-        new(@"^([A-Z]+)(\d+)$", RegexOptions.Compiled);
+        new(@"^([A-Z]+)-?(\d+)$", RegexOptions.Compiled);
 
     private readonly HttpClient _httpClient;
     private readonly OpenAiSettings _settings;
@@ -129,7 +129,6 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
         var codigo = limpio
             .Replace(" ", "", StringComparison.Ordinal)
-            .Replace("-", "", StringComparison.Ordinal)
             .Replace("*", "", StringComparison.Ordinal)
             .ToUpperInvariant();
 

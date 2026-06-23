@@ -34,8 +34,7 @@ public class ReprocesoAppServiceTests
 
             resultado.Should().Be(SoporteProcesamientoEstado.Exito);
 
-            handler.UltimoJsonDatos.Should().Contain("\"soporte\":\"KE470549\"");
-            handler.UltimoJsonDatos.Should().NotContain("KE-470549");
+            handler.UltimoJsonDatos.Should().Contain("\"soporte\":\"KE-470549\"");
             handler.UltimoMultipartFisico.Should().Contain("name=soporte");
             handler.UltimoMultipartFisico.Should().Contain("KE470549");
             handler.UltimoMultipartFisico.Should().NotContain("KE-470549");
@@ -77,8 +76,10 @@ public class ReprocesoAppServiceTests
                 usuario,
                 fecha,
                 nombreArchivo,
-                "KE470549",
+                "KE-470549",
                 1,
+                "B1",
+                "C1",
                 Arg.Any<CancellationToken>());
         }
         finally
@@ -146,6 +147,8 @@ public class ReprocesoAppServiceTests
                 Arg.Any<string>(),
                 Arg.Any<string?>(),
                 Arg.Any<int?>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
                 Arg.Any<CancellationToken>())
             .Returns(true);
         trazabilidad.ListarDocumentosPendientesAsync(
