@@ -95,7 +95,9 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                     Estado = DocumentoProcesamientoEstado.FalloApiFisico,
                     Documento = documento,
                     Soporte = soporte,
-                    IdPaciente = resultado.Datos?.IdPaciente
+                    IdPaciente = resultado.Datos?.IdPaciente,
+                    IdBodega = resultado.Datos?.IdBodega,
+                    IdCartera = resultado.Datos?.IdCartera
                 };
             }
 
@@ -104,7 +106,9 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Estado = DocumentoProcesamientoEstado.Exito,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente
+                IdPaciente = resultado.Datos?.IdPaciente,
+                IdBodega = resultado.Datos?.IdBodega,
+                IdCartera = resultado.Datos?.IdCartera
             };
         }
         catch (OperationCanceledException)
@@ -150,14 +154,18 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Estado = DocumentoProcesamientoEstado.FalloApiFisico,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente
+                IdPaciente = resultado.Datos?.IdPaciente,
+                IdBodega = resultado.Datos?.IdBodega,
+                IdCartera = resultado.Datos?.IdCartera
             },
             _ => new DocumentoProcesamientoResult
             {
                 Estado = DocumentoProcesamientoEstado.Exito,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente
+                IdPaciente = resultado.Datos?.IdPaciente,
+                IdBodega = resultado.Datos?.IdBodega,
+                IdCartera = resultado.Datos?.IdCartera
             }
         };
     }

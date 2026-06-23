@@ -93,8 +93,8 @@ public class SoporteNormalizationTests
             body.Should().NotContain("D1-1523229");
             body.Should().NotContain("D11523229-");
             body.Should().Contain("name=idConvenio");
-            body.Should().Contain("01");
-            body.Should().NotContain("name=idConvenio\r\n\r\n1\r\n");
+            body.Should().Contain("1");
+            body.Should().NotContain("name=idConvenio\r\n\r\n01\r\n");
         }
         finally
         {

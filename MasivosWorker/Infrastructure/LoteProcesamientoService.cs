@@ -488,6 +488,8 @@ public class LoteProcesamientoService : ILoteProcesamientoService
             nombreArchivo,
             resultado.Soporte,
             resultado.IdPaciente,
+            resultado.IdBodega,
+            resultado.IdCartera,
             procesado,
             cancellationToken);
     }

@@ -359,6 +359,8 @@ public class Worker2IntegracionProduccionTests
             nombreArchivo,
             soporte: null,
             idPaciente: null,
+            idBodega: null,
+            idCartera: null,
             procesado: false,
             CancellationToken.None);
 
@@ -367,6 +369,8 @@ public class Worker2IntegracionProduccionTests
             nombreArchivo,
             soporte: "FCA62993",
             idPaciente: 30233836,
+            idBodega: "12",
+            idCartera: "34",
             procesado: true,
             CancellationToken.None);
 

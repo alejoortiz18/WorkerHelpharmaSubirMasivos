@@ -10,6 +10,10 @@ public class DocumentoProcesamientoResult
 
     public int? IdPaciente { get; init; }
 
+    public string? IdBodega { get; init; }
+
+    public string? IdCartera { get; init; }
+
     public bool EsExitoso => Estado == DocumentoProcesamientoEstado.Exito;
 }
 

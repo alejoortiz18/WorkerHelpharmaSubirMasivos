@@ -34,7 +34,7 @@ public class SoporteFisicoApiService
             using var form = new MultipartFormDataContent();
 
             form.Add(new StringContent(soporteNormalizado), "soporte");
-            form.Add(new StringContent(data.IdConvenio ?? string.Empty), "idConvenio");
+            form.Add(new StringContent(NormalizarIdConvenio(data.IdConvenio)), "idConvenio");
             form.Add(new StringContent(data.NombreConvenio ?? ""), "nombreConvenio");
             form.Add(new StringContent(data.Fecha.ToString("yyyy-MM-dd HH:mm:ss")), "fecha");
             form.Add(new StringContent(data.IdBodega ?? ""), "idBodega");
@@ -109,4 +109,19 @@ public class SoporteFisicoApiService
 
     private static string NormalizarSoporte(string soporte) =>
         soporte.Replace("-", string.Empty);
+
+    /// <summary>
+    /// El API físico exige idConvenio como entero; el API de datos puede devolver "01".
+    /// Misma lógica que GestionArchivosEscaneados.Infrastructure.Api.SoporteFisicoApiService.
+    /// </summary>
+    private static string NormalizarIdConvenio(string? idConvenio)
+    {
+        if (string.IsNullOrWhiteSpace(idConvenio))
+            return string.Empty;
+
+        var limpio = idConvenio.Trim();
+        return int.TryParse(limpio, out var numero)
+            ? numero.ToString()
+            : limpio;
+    }
 }

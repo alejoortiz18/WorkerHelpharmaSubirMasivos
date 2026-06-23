@@ -45,6 +45,8 @@ CREATE TABLE dbo.DocumentosProcesados
     NombreArchivo nvarchar(260) NOT NULL,
     Soporte nvarchar(100) NULL,
     IdPaciente int NULL,
+    IdBodega nvarchar(100) NULL,
+    IdCartera nvarchar(100) NULL,
     Procesado bit NOT NULL,
     FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_DocumentosProcesados_FechaCreacion DEFAULT (sysdatetime()),
     CONSTRAINT FK_DocumentosProcesados_FechasProcesamiento FOREIGN KEY (FechaProcesamientoId) REFERENCES dbo.FechasProcesamiento(FechaProcesamientoId)
@@ -93,6 +95,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_RegistrarDocumentoProcesado
     @NombreArchivo nvarchar(260),
     @Soporte nvarchar(100) = NULL,
     @IdPaciente int = NULL,
+    @IdBodega nvarchar(100) = NULL,
+    @IdCartera nvarchar(100) = NULL,
     @Procesado bit
 AS
 BEGIN
@@ -132,6 +136,8 @@ BEGIN
         NombreArchivo,
         Soporte,
         IdPaciente,
+        IdBodega,
+        IdCartera,
         Procesado
     )
     VALUES
@@ -140,6 +146,8 @@ BEGIN
         @NombreArchivo,
         @Soporte,
         @IdPaciente,
+        @IdBodega,
+        @IdCartera,
         @Procesado
     );
 END

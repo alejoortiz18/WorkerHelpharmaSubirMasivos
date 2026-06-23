@@ -15,6 +15,8 @@ public interface ITrazabilidadSqlService
         string nombreArchivo,
         string? soporte,
         int? idPaciente,
+        string? idBodega,
+        string? idCartera,
         bool procesado,
         CancellationToken cancellationToken = default);
 }
@@ -72,6 +74,8 @@ BEGIN
         NombreArchivo nvarchar(260) NOT NULL,
         Soporte nvarchar(100) NULL,
         IdPaciente int NULL,
+        IdBodega nvarchar(100) NULL,
+        IdCartera nvarchar(100) NULL,
         Procesado bit NOT NULL,
         FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_DocumentosProcesados_FechaCreacion DEFAULT (sysdatetime()),
         CONSTRAINT FK_DocumentosProcesados_FechasProcesamiento FOREIGN KEY (FechaProcesamientoId) REFERENCES dbo.FechasProcesamiento(FechaProcesamientoId)
@@ -80,6 +84,12 @@ BEGIN
     CREATE INDEX IX_DocumentosProcesados_FechaProcesamientoId
         ON dbo.DocumentosProcesados (FechaProcesamientoId);
 END
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdBodega') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD IdBodega nvarchar(100) NULL;
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdCartera') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD IdCartera nvarchar(100) NULL;
 
 ;WITH Duplicados AS
 (
@@ -168,6 +178,8 @@ BEGIN
         @NombreArchivo nvarchar(260),
         @Soporte nvarchar(100) = NULL,
         @IdPaciente int = NULL,
+        @IdBodega nvarchar(100) = NULL,
+        @IdCartera nvarchar(100) = NULL,
         @Procesado bit
     AS
     BEGIN
@@ -208,6 +220,8 @@ BEGIN
         SET
             Soporte = COALESCE(@Soporte, Soporte),
             IdPaciente = COALESCE(@IdPaciente, IdPaciente),
+            IdBodega = COALESCE(@IdBodega, IdBodega),
+            IdCartera = COALESCE(@IdCartera, IdCartera),
             Procesado = CASE WHEN @Procesado = 1 THEN 1 ELSE Procesado END
         WHERE FechaProcesamientoId = @FechaId
           AND NombreArchivo = @NombreArchivo;
@@ -220,6 +234,8 @@ BEGIN
                 NombreArchivo,
                 Soporte,
                 IdPaciente,
+                IdBodega,
+                IdCartera,
                 Procesado
             )
             VALUES
@@ -228,6 +244,8 @@ BEGIN
                 @NombreArchivo,
                 @Soporte,
                 @IdPaciente,
+                @IdBodega,
+                @IdCartera,
                 @Procesado
             );
         END
@@ -245,6 +263,8 @@ END
         string nombreArchivo,
         string? soporte,
         int? idPaciente,
+        string? idBodega,
+        string? idCartera,
         bool procesado,
         CancellationToken cancellationToken = default)
     {
@@ -286,6 +306,8 @@ UPDATE dbo.DocumentosProcesados
 SET
     Soporte = COALESCE(@Soporte, Soporte),
     IdPaciente = COALESCE(@IdPaciente, IdPaciente),
+    IdBodega = COALESCE(@IdBodega, IdBodega),
+    IdCartera = COALESCE(@IdCartera, IdCartera),
     Procesado = CASE WHEN @Procesado = 1 THEN 1 ELSE Procesado END
 WHERE FechaProcesamientoId = @FechaId
   AND NombreArchivo = @NombreArchivo;
@@ -298,6 +320,8 @@ BEGIN
         NombreArchivo,
         Soporte,
         IdPaciente,
+        IdBodega,
+        IdCartera,
         Procesado
     )
     VALUES
@@ -306,6 +330,8 @@ BEGIN
         @NombreArchivo,
         @Soporte,
         @IdPaciente,
+        @IdBodega,
+        @IdCartera,
         @Procesado
     );
 END
@@ -323,16 +349,20 @@ COMMIT TRAN;
                 command.Parameters.AddWithValue("@NombreArchivo", nombreArchivo);
                 command.Parameters.Add("@Soporte", System.Data.SqlDbType.NVarChar, 100).Value = (object?)soporte ?? DBNull.Value;
                 command.Parameters.Add("@IdPaciente", System.Data.SqlDbType.Int).Value = (object?)idPaciente ?? DBNull.Value;
+                command.Parameters.Add("@IdBodega", System.Data.SqlDbType.NVarChar, 100).Value = (object?)idBodega ?? DBNull.Value;
+                command.Parameters.Add("@IdCartera", System.Data.SqlDbType.NVarChar, 100).Value = (object?)idCartera ?? DBNull.Value;
                 command.Parameters.Add("@Procesado", System.Data.SqlDbType.Bit).Value = procesado;
             });
 
             _logger.LogInformation(
-                "TrazabilidadDocumentoRegistrada | Usuario={Usuario} | Fecha={Fecha} | Archivo={Archivo} | Soporte={Soporte} | IdPaciente={IdPaciente} | Procesado={Procesado}",
+                "TrazabilidadDocumentoRegistrada | Usuario={Usuario} | Fecha={Fecha} | Archivo={Archivo} | Soporte={Soporte} | IdPaciente={IdPaciente} | IdBodega={IdBodega} | IdCartera={IdCartera} | Procesado={Procesado}",
                 contexto.Usuario,
                 contexto.Fecha,
                 nombreArchivo,
                 soporte ?? "(null)",
                 idPaciente?.ToString() ?? "(null)",
+                idBodega ?? "(null)",
+                idCartera ?? "(null)",
                 procesado);
         }
         catch (SqlException ex)
