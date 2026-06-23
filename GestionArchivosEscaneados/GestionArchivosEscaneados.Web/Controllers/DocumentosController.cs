@@ -254,6 +254,7 @@ public class DocumentosController : Controller
                 {
                     NombreArchivo = a.NombreArchivo,
                     Fecha = a.Fecha,
+                    FechaFactura = a.FechaFactura,
                     CodigoBarras = previo?.CodigoBarras ?? string.Empty,
                     ErrorProceso = previo?.ErrorProceso ?? false,
                     TieneIntentoPrevio = a.TieneIntentoPrevio || previo?.TieneIntentoPrevio == true

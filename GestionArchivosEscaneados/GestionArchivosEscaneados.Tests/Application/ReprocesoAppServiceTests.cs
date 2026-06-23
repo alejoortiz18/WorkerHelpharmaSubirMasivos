@@ -80,6 +80,7 @@ public class ReprocesoAppServiceTests
                 1,
                 "B1",
                 "C1",
+                Arg.Any<DateTime?>(),
                 Arg.Any<CancellationToken>());
         }
         finally
@@ -149,6 +150,7 @@ public class ReprocesoAppServiceTests
                 Arg.Any<int?>(),
                 Arg.Any<string?>(),
                 Arg.Any<string?>(),
+                Arg.Any<DateTime?>(),
                 Arg.Any<CancellationToken>())
             .Returns(true);
         trazabilidad.ListarDocumentosPendientesAsync(

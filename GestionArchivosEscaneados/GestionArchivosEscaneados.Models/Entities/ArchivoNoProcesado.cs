@@ -9,4 +9,6 @@ public class ArchivoNoProcesado
     public required string RutaCompleta { get; init; }
 
     public bool TieneIntentoPrevio { get; init; }
+
+    public DateTime? FechaFactura { get; init; }
 }

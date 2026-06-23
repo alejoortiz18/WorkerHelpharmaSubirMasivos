@@ -22,6 +22,7 @@ public static class EtiquetasUi
     public const string VolverResumen = "Volver al resumen";
     public const string Archivo = "Archivo";
     public const string Fecha = "Fecha";
+    public const string FechaFactura = "Fecha factura";
     public const string Eliminar = "Eliminar";
     public const string ConfirmarEliminacion = "Confirmar eliminación";
     public const string Cancelar = "Cancelar";

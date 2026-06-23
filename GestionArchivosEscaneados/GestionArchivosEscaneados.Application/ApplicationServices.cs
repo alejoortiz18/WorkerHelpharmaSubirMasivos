@@ -121,7 +121,8 @@ public class ReprocesoAppService
                     NombreArchivo = archivo.NombreArchivo,
                     Fecha = archivo.Fecha,
                     RutaCompleta = archivo.RutaCompleta,
-                    TieneIntentoPrevio = archivo.TieneIntentoPrevio || pendiente?.TieneIntentoPrevio == true
+                    TieneIntentoPrevio = archivo.TieneIntentoPrevio || pendiente?.TieneIntentoPrevio == true,
+                    FechaFactura = pendiente?.FechaFactura
                 };
             }).ToList();
 
@@ -186,6 +187,7 @@ public class ReprocesoAppService
             resultado.Datos?.IdPaciente,
             resultado.Datos?.IdBodega,
             resultado.Datos?.IdCartera,
+            resultado.Datos?.Fecha,
             cancellationToken);
         if (!actualizado)
             return SoporteProcesamientoEstado.ErrorInesperado;
@@ -301,6 +303,7 @@ public class ReprocesoAppService
             resultado.Datos?.IdPaciente,
             resultado.Datos?.IdBodega,
             resultado.Datos?.IdCartera,
+            resultado.Datos?.Fecha,
             cancellationToken);
         if (!actualizado)
             return SoporteProcesamientoEstado.ErrorInesperado;

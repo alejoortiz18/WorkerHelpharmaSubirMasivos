@@ -38,6 +38,7 @@ public interface ITrazabilidadConsultaSqlService
         int? idPaciente,
         string? idBodega,
         string? idCartera,
+        DateTime? fechaFactura,
         CancellationToken cancellationToken = default);
 
     Task<bool> EliminarDocumentoPendienteAsync(
@@ -115,6 +116,7 @@ BEGIN
         IdPaciente int NULL,
         IdBodega nvarchar(100) NULL,
         IdCartera nvarchar(100) NULL,
+        FechaFactura datetime2(0) NULL,
         Procesado bit NOT NULL,
         FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_DocumentosProcesados_FechaCreacion DEFAULT (sysdatetime()),
         CONSTRAINT FK_DocumentosProcesados_FechasProcesamiento FOREIGN KEY (FechaProcesamientoId) REFERENCES dbo.FechasProcesamiento(FechaProcesamientoId)
@@ -129,6 +131,9 @@ IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdBodega') IS NULL
 
 IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdCartera') IS NULL
     ALTER TABLE dbo.DocumentosProcesados ADD IdCartera nvarchar(100) NULL;
+
+IF COL_LENGTH(N'dbo.DocumentosProcesados', N'FechaFactura') IS NULL
+    ALTER TABLE dbo.DocumentosProcesados ADD FechaFactura datetime2(0) NULL;
 
 IF OBJECT_ID(N'dbo.Configuraciones', N'U') IS NULL
 BEGIN
@@ -307,7 +312,8 @@ WHERE u.NombreUsuario = @NombreUsuario
         const string sql = """
 SELECT
     dp.NombreArchivo,
-    CASE WHEN dp.Soporte IS NULL OR LTRIM(RTRIM(dp.Soporte)) = N'' THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS TieneIntentoPrevio
+    CASE WHEN dp.Soporte IS NULL OR LTRIM(RTRIM(dp.Soporte)) = N'' THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS TieneIntentoPrevio,
+    dp.FechaFactura
 FROM dbo.DocumentosProcesados dp
 INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
 INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
@@ -329,7 +335,8 @@ ORDER BY dp.NombreArchivo;
                     documentos.Add(new DocumentoPendiente
                     {
                         NombreArchivo = reader.GetString(0),
-                        TieneIntentoPrevio = reader.GetBoolean(1)
+                        TieneIntentoPrevio = reader.GetBoolean(1),
+                        FechaFactura = reader.IsDBNull(2) ? null : reader.GetDateTime(2)
                     });
                 }
 
@@ -387,6 +394,7 @@ WHERE u.NombreUsuario = @NombreUsuario
         int? idPaciente,
         string? idBodega,
         string? idCartera,
+        DateTime? fechaFactura,
         CancellationToken cancellationToken = default)
     {
         const string sql = """
@@ -396,6 +404,7 @@ SET
     dp.IdPaciente = @IdPaciente,
     dp.IdBodega = @IdBodega,
     dp.IdCartera = @IdCartera,
+    dp.FechaFactura = @FechaFactura,
     dp.Procesado = 1
 FROM dbo.DocumentosProcesados dp
 INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
@@ -424,6 +433,8 @@ WHERE u.NombreUsuario = @NombreUsuario
                     (object?)idBodega ?? DBNull.Value;
                 command.Parameters.Add("@IdCartera", System.Data.SqlDbType.NVarChar, 100).Value =
                     (object?)idCartera ?? DBNull.Value;
+                command.Parameters.Add("@FechaFactura", System.Data.SqlDbType.DateTime2).Value =
+                    (object?)fechaFactura ?? DBNull.Value;
             });
 
         if (affected <= 0)

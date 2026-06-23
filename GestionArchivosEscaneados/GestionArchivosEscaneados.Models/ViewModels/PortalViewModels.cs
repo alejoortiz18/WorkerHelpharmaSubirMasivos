@@ -61,6 +61,8 @@ public class ArchivoNoProcesadoItemViewModel
     public bool ErrorProceso { get; set; }
 
     public bool TieneIntentoPrevio { get; set; }
+
+    public DateTime? FechaFactura { get; set; }
 }
 
 public class ProcesarLoteRequest

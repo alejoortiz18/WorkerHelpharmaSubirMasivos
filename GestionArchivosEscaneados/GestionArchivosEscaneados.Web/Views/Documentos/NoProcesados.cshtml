@@ -54,7 +54,7 @@
                                 <thead>
                                     <tr>
                                         <th class="docs-col-file">@GestionArchivosEscaneados.Constants.EtiquetasUi.Archivo</th>
-                                        <th class="docs-col-date">@GestionArchivosEscaneados.Constants.EtiquetasUi.Fecha</th>
+                                        <th class="docs-col-date">@GestionArchivosEscaneados.Constants.EtiquetasUi.FechaFactura</th>
                                         <th class="docs-col-barcode">@GestionArchivosEscaneados.Constants.EtiquetasUi.CodigoBarras</th>
                                         <th class="docs-col-actions"></th>
                                     </tr>
@@ -82,7 +82,14 @@
                                                 </div>
                                             </td>
                                             <td class="docs-col-date">
-                                                <span class="docs-date-pill">@archivo.Fecha</span>
+                                                @if (archivo.FechaFactura.HasValue)
+                                                {
+                                                    <span class="docs-date-pill">@archivo.FechaFactura.Value.ToString("yyyy-MM-dd")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
                                             </td>
                                             <td class="docs-col-barcode">
                                                <input asp-for="Archivos[i].CodigoBarras"
