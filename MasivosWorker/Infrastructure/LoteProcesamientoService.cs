@@ -16,7 +16,6 @@ public class LoteProcesamientoService : ILoteProcesamientoService
     private readonly IOpenAiBarcodeService _openAiBarcode;
     private readonly IEmailNotificationService _emailNotification;
     private readonly ITrazabilidadSqlService _trazabilidadSql;
-    private readonly LogDiarioService _logDiario;
     private readonly RedDisponibleService _redDisponible;
     private readonly ILogger<LoteProcesamientoService> _logger;
     private readonly int _tamanoLote;
@@ -29,7 +28,6 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         IOpenAiBarcodeService openAiBarcode,
         IEmailNotificationService emailNotification,
         ITrazabilidadSqlService trazabilidadSql,
-        LogDiarioService logDiario,
         RedDisponibleService redDisponible,
         IOptions<FileSettings> fileSettings,
         ILogger<LoteProcesamientoService> logger)
@@ -39,7 +37,6 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         _openAiBarcode = openAiBarcode;
         _emailNotification = emailNotification;
         _trazabilidadSql = trazabilidadSql;
-        _logDiario = logDiario;
         _redDisponible = redDisponible;
         _logger = logger;
         _tamanoLote = Math.Max(1, fileSettings.Value.TamanoLote);
@@ -180,12 +177,6 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                 errorOpenAiLote,
                 cancellationToken);
         }
-
-        await _logDiario.IncrementarAsync(
-            contexto,
-            procesadosLote,
-            noProcesadosLote,
-            cancellationToken);
 
         if (huboIncidenciaInfraestructura)
         {

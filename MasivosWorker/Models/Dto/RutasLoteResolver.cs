@@ -41,8 +41,7 @@ public static class RutasLoteResolver
             Error = Path.Combine(carpetaDia, "error"),
             Procesaria = Path.Combine(carpetaDia, "procesaria"),
             Noprocesados = Path.Combine(carpetaDia, "noprocesados"),
-            Procesados = Path.Combine(carpetaDia, "procesados"),
-            Log = Path.Combine(carpetaDia, "log")
+            Procesados = Path.Combine(carpetaDia, "procesados")
         };
     }
 }

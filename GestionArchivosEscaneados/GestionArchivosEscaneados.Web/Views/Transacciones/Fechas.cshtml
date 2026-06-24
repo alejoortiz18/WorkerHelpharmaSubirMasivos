@@ -1,0 +1,34 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.FechasEscaneo;
+}
+@model GestionArchivosEscaneados.Models.ViewModels.TransaccionesFechasViewModel
+
+<div class="mb-3">
+    <a asp-action="Index" class="btn btn-link ps-0">@GestionArchivosEscaneados.Constants.EtiquetasUi.VolverUsuarios</a>
+</div>
+
+<div class="page-header mb-4">
+    <h1 class="h3 mb-1">@GestionArchivosEscaneados.Constants.EtiquetasUi.FechasEscaneo</h1>
+    <p class="text-muted mb-0">Usuario: <strong>@Model.Usuario</strong></p>
+</div>
+
+@if (Model.Fechas.Count == 0)
+{
+    <div class="alert alert-info">@GestionArchivosEscaneados.Constants.EtiquetasUi.SinFechas</div>
+}
+else
+{
+    <div class="card shadow-sm border-0">
+        <div class="list-group list-group-flush">
+            @foreach (var fecha in Model.Fechas)
+            {
+                <a asp-action="Documentos" asp-route-usuario="@Model.Usuario" asp-route-fecha="@fecha"
+                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span>@fecha</span>
+                    <span class="text-muted">&rarr;</span>
+                </a>
+            }
+        </div>
+    </div>
+}

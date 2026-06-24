@@ -23,8 +23,6 @@ public class RutasLoteResolverTests
         ctx.Procesaria.Should().EndWith(@"\procesaria");
         ctx.Noprocesados.Should().EndWith(@"\noprocesados");
         ctx.Procesados.Should().EndWith(@"\procesados");
-        ctx.Log.Should().EndWith(@"\log");
-        ctx.RutaLogDiario.Should().EndWith(@"2026-06-03\log\2026-06-03.txt");
     }
 
     [Fact]
@@ -34,41 +32,6 @@ public class RutasLoteResolverTests
             @"\\192.168.0.69\ArchivosScaneados\alejandro.ortiz\2026-06-03");
 
         act.Should().Throw<InvalidOperationException>();
-    }
-}
-
-public class LogDiarioServiceTests
-{
-    [Fact]
-    public async Task IncrementarAsync_AcumulaContadoresEnArchivoDiario()
-    {
-        var temp = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        var ctx = new RutasLoteContext
-        {
-            Usuario = "test.user",
-            Fecha = "2026-06-03",
-            Procesar = Path.Combine(temp, "procesar"),
-            Procesando = Path.Combine(temp, "procesando"),
-            Error = Path.Combine(temp, "error"),
-            Procesaria = Path.Combine(temp, "procesaria"),
-            Noprocesados = Path.Combine(temp, "noprocesados"),
-            Procesados = Path.Combine(temp, "procesados"),
-            Log = Path.Combine(temp, "log")
-        };
-
-        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<LogDiarioService>.Instance;
-        var service = new LogDiarioService(logger);
-
-        Directory.CreateDirectory(ctx.Log); // simula carpeta creada por Worker 1
-
-        await service.IncrementarAsync(ctx, 3, 1);
-        await service.IncrementarAsync(ctx, 2, 4);
-
-        var contenido = await File.ReadAllTextAsync(ctx.RutaLogDiario);
-        contenido.Should().Contain("CantidadProcesados:5");
-        contenido.Should().Contain("NoProcesados:5");
-
-        Directory.Delete(temp, recursive: true);
     }
 }
 

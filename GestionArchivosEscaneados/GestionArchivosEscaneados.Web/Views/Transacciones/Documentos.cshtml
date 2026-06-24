@@ -1,0 +1,105 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = GestionArchivosEscaneados.Constants.EtiquetasUi.DocumentosProcesados;
+}
+@model GestionArchivosEscaneados.Models.ViewModels.TransaccionesDocumentosViewModel
+
+<div class="mb-3">
+    <a asp-action="Fechas" asp-route-usuario="@Model.Usuario" class="btn btn-link ps-0">
+        @GestionArchivosEscaneados.Constants.EtiquetasUi.VolverFechas
+    </a>
+</div>
+
+<div class="tx-doc-header mb-4">
+    <div class="tx-doc-header-main">
+        <h1 class="h3 mb-1">@GestionArchivosEscaneados.Constants.EtiquetasUi.DocumentosProcesados</h1>
+        <p class="text-muted mb-0">
+            Usuario: <strong>@Model.Usuario</strong> · Fecha: <strong>@Model.Fecha</strong>
+        </p>
+    </div>
+    @if (Model.Documentos.Count > 0)
+    {
+        <div class="tx-summary-card">
+            <div class="tx-summary-label">@GestionArchivosEscaneados.Constants.EtiquetasUi.TotalArchivos</div>
+            <div class="tx-summary-value" id="tx-total-archivos">@Model.Documentos.Count</div>
+            <div class="tx-summary-sub text-muted" id="tx-resumen-filtrado"></div>
+        </div>
+    }
+</div>
+
+@if (Model.Documentos.Count == 0)
+{
+    <div class="alert alert-info">@GestionArchivosEscaneados.Constants.EtiquetasUi.SinDocumentos</div>
+}
+else
+{
+    <div class="card shadow-sm border-0 docs-table-card">
+        <div class="docs-table-wrap tx-table-wrap">
+            <table class="table docs-table tx-table mb-0" id="tx-documentos-table">
+                <thead>
+                    <tr>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.IdRegistro</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.Archivo</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.Soporte</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.IdPaciente</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.IdBodega</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.IdCartera</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.FechaFactura</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.Procesado</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.FechaCreacion</th>
+                    </tr>
+                    <tr class="tx-filter-row">
+                        @for (var i = 0; i < 9; i++)
+                        {
+                            <th>
+                                <input type="text" class="form-control form-control-sm tx-col-filter"
+                                       placeholder="@GestionArchivosEscaneados.Constants.EtiquetasUi.FiltrarColumna"
+                                       data-col="@i" autocomplete="off" />
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in Model.Documentos)
+                    {
+                        <tr>
+                            <td>@doc.DocumentoProcesadoId</td>
+                            <td>@doc.NombreArchivo</td>
+                            <td>@(doc.Soporte ?? "—")</td>
+                            <td>@(doc.IdPaciente?.ToString() ?? "—")</td>
+                            <td>@(doc.IdBodega ?? "—")</td>
+                            <td>@(doc.IdCartera ?? "—")</td>
+                            <td>@(doc.FechaFactura?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            <td>@(doc.Procesado ? "Sí" : "No")</td>
+                            <td>@doc.FechaCreacion.ToString("yyyy-MM-dd HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="tx-pagination-bar">
+            <div class="tx-pagination-size">
+                <label class="form-label mb-0 me-2" for="tx-page-size">@GestionArchivosEscaneados.Constants.EtiquetasUi.FilasPorPagina</label>
+                <select id="tx-page-size" class="form-select form-select-sm tx-page-size-select">
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <div class="tx-pagination-info text-muted" id="tx-pagination-info"></div>
+            <div class="tx-pagination-actions">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-page-prev" disabled>
+                    @GestionArchivosEscaneados.Constants.EtiquetasUi.Anterior
+                </button>
+                <span class="tx-page-label" id="tx-page-label"></span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="tx-page-next" disabled>
+                    @GestionArchivosEscaneados.Constants.EtiquetasUi.Siguiente
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script src="~/js/transacciones-filter.js" asp-append-version="true"></script>
+}
+

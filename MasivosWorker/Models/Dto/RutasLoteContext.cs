@@ -21,10 +21,6 @@ public class RutasLoteContext
 
     public required string Procesados { get; init; }
 
-    public required string Log { get; init; }
-
-    public string RutaLogDiario => Path.Combine(Log, $"{Fecha}.txt");
-
     public IEnumerable<string> CarpetasOperativas =>
     [
         Procesar,
@@ -32,8 +28,7 @@ public class RutasLoteContext
         Error,
         Procesaria,
         Noprocesados,
-        Procesados,
-        Log
+        Procesados
     ];
 
     public IEnumerable<string> CarpetasLimpieza =>

@@ -1,3 +1,4 @@
+using GestionArchivosEscaneados.Models.Entities;
 using GestionArchivosEscaneados.Models.Enums;
 
 namespace GestionArchivosEscaneados.Models.ViewModels;
@@ -93,4 +94,25 @@ public class ReprocesoResultViewModel
     public bool Exito { get; set; }
 
     public SoporteProcesamientoEstado Estado { get; set; }
+}
+
+public class TransaccionesUsuariosViewModel
+{
+    public IReadOnlyList<string> Usuarios { get; set; } = [];
+}
+
+public class TransaccionesFechasViewModel
+{
+    public string Usuario { get; set; } = string.Empty;
+
+    public IReadOnlyList<string> Fechas { get; set; } = [];
+}
+
+public class TransaccionesDocumentosViewModel
+{
+    public string Usuario { get; set; } = string.Empty;
+
+    public string Fecha { get; set; } = string.Empty;
+
+    public IReadOnlyList<DocumentoProcesadoConsulta> Documentos { get; set; } = [];
 }

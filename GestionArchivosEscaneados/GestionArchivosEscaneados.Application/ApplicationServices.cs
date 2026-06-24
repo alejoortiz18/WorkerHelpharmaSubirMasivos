@@ -391,6 +391,35 @@ public class ReprocesoAppService
     }
 }
 
+public class TransaccionesAppService
+{
+    private readonly ITrazabilidadConsultaSqlService _trazabilidad;
+
+    public TransaccionesAppService(ITrazabilidadConsultaSqlService trazabilidad)
+    {
+        _trazabilidad = trazabilidad;
+    }
+
+    public Task<IReadOnlyList<string>> ListarUsuariosAsync(CancellationToken cancellationToken = default) =>
+        _trazabilidad.ListarUsuariosConEscaneosAsync(cancellationToken);
+
+    public Task<IReadOnlyList<string>> ListarFechasAsync(
+        string usuario,
+        CancellationToken cancellationToken = default) =>
+        _trazabilidad.ListarFechasDisponiblesAsync(usuario, cancellationToken);
+
+    public async Task<IReadOnlyList<DocumentoProcesadoConsulta>> ListarDocumentosAsync(
+        string usuario,
+        string fecha,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _trazabilidad.FechaExisteAsync(usuario, fecha, cancellationToken))
+            return [];
+
+        return await _trazabilidad.ListarDocumentosProcesadosAsync(usuario, fecha, cancellationToken);
+    }
+}
+
 public static class ApplicationServiceCollectionExtensions
 {
     public static IServiceCollection AddGestionArchivosApplication(this IServiceCollection services)
@@ -399,6 +428,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<CalendarioAppService>();
         services.AddSingleton<DashboardAppService>();
         services.AddSingleton<ReprocesoAppService>();
+        services.AddSingleton<TransaccionesAppService>();
         return services;
     }
 }

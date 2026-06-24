@@ -80,9 +80,6 @@ public class Worker2IntegracionProduccionTests
         Worker2IntegracionHelper.CopiarPdfPrueba(PdfConBarcode, escenario.Contexto.Procesar, escenario);
         var txt = escenario.CrearTxtLote();
 
-        var logDiario = new LogDiarioService(NullLogger<LogDiarioService>.Instance);
-        var antes = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
-
         var servicio = Worker2IntegracionHelper.CrearServicioLote(soporteOverride: soporteMock);
 
         await servicio.ProcesarLoteAsync(txt, CancellationToken.None);
@@ -91,9 +88,6 @@ public class Worker2IntegracionProduccionTests
         File.Exists(Path.Combine(escenario.Contexto.Procesar, PdfConBarcode)).Should().BeFalse();
         File.Exists(Path.Combine(escenario.Contexto.Noprocesados, PdfConBarcode)).Should().BeFalse(
             "el PDF de prueba debe procesarse, no quedar en noprocesados");
-
-        var despues = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
-        (despues.Procesados - antes.Procesados).Should().Be(1);
 
         await soporteMock.Received(1).ProcesarAsync(
             Arg.Is<string>(s => s.Length > 0 && char.IsLetter(s[0])),
@@ -128,8 +122,6 @@ public class Worker2IntegracionProduccionTests
             Worker2IntegracionHelper.CopiarPdfPrueba(pdf, escenario.Contexto.Procesar, escenario);
 
         var txt = escenario.CrearTxtLote();
-        var logDiario = new LogDiarioService(NullLogger<LogDiarioService>.Instance);
-        var antes = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
 
         var servicio = Worker2IntegracionHelper.CrearServicioLote(soporteOverride: soporteMock);
 
@@ -142,8 +134,6 @@ public class Worker2IntegracionProduccionTests
             File.Exists(Path.Combine(escenario.Contexto.Noprocesados, pdf)).Should().BeFalse();
         }
 
-        var despues = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
-        (despues.Procesados - antes.Procesados).Should().Be(3);
         await soporteMock.Received(3).ProcesarAsync(
             Arg.Any<string>(),
             Arg.Any<string>(),
@@ -163,15 +153,9 @@ public class Worker2IntegracionProduccionTests
         Worker2IntegracionHelper.CopiarPdfPrueba(PdfConBarcode, escenario.Contexto.Procesar, escenario);
         var txt = escenario.CrearTxtLote();
 
-        var logDiario = new LogDiarioService(NullLogger<LogDiarioService>.Instance);
-        var antes = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
-
         var servicio = Worker2IntegracionHelper.CrearServicioLote();
 
         await servicio.ProcesarLoteAsync(txt, CancellationToken.None);
-
-        var despues = await logDiario.LeerContadoresAsync(escenario.Contexto.RutaLogDiario, CancellationToken.None);
-        (despues.Procesados - antes.Procesados).Should().Be(1);
     }
 
     [Fact]
@@ -344,8 +328,7 @@ public class Worker2IntegracionProduccionTests
             Error = @"C:\temp\error",
             Procesaria = @"C:\temp\procesaria",
             Noprocesados = @"C:\temp\noprocesados",
-            Procesados = @"C:\temp\procesados",
-            Log = @"C:\temp\log"
+            Procesados = @"C:\temp\procesados"
         };
 
         var trazabilidad = new TrazabilidadSqlService(
@@ -441,8 +424,7 @@ public sealed class Worker2EscenarioProduccion : IDisposable
             Error = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "error")),
             Procesaria = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "procesaria")),
             Noprocesados = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "noprocesados")),
-            Procesados = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "procesados")),
-            Log = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "log"))
+            Procesados = Worker2IntegracionHelper.NormalizarRutaUnc(Path.Combine(carpetaDia, "procesados"))
         };
 
         Directory.CreateDirectory(ArchivosNuevos);

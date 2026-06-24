@@ -166,7 +166,7 @@ public class TrazabilidadIdBodegaCarteraE2ETests
         string raiz, string usuario, string fecha, string rutaPdfOrigen, string nombrePdf)
     {
         var carpetaDia = Path.Combine(raiz, usuario, fecha);
-        foreach (var sub in new[] { "procesar", "procesando", "procesaria", "noprocesados", "procesados", "error", "log" })
+        foreach (var sub in new[] { "procesar", "procesando", "procesaria", "noprocesados", "procesados", "error" })
             Directory.CreateDirectory(Path.Combine(carpetaDia, sub));
 
         var procesar = Path.Combine(carpetaDia, "procesar");

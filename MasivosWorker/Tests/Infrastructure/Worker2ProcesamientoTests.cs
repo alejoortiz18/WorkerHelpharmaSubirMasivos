@@ -36,8 +36,7 @@ public sealed class Worker2Escenario : IDisposable
             Error = Path.Combine(carpetaDia, "error"),
             Procesaria = Path.Combine(carpetaDia, "procesaria"),
             Noprocesados = Path.Combine(carpetaDia, "noprocesados"),
-            Procesados = Path.Combine(carpetaDia, "procesados"),
-            Log = Path.Combine(carpetaDia, "log")
+            Procesados = Path.Combine(carpetaDia, "procesados")
         };
 
         Directory.CreateDirectory(ArchivosNuevos);
@@ -97,7 +96,6 @@ public sealed class Worker2Escenario : IDisposable
             openAi,
             email,
             new NoopTrazabilidadSqlService(),
-            new LogDiarioService(NullLogger<LogDiarioService>.Instance),
             redDisponible,
             fileSettings,
             NullLogger<LoteProcesamientoService>.Instance);
@@ -416,26 +414,5 @@ public class Worker2ProcesamientoTests
 
         File.Exists(txt).Should().BeTrue("TXT se conserva si faltan carpetas");
         await documento.DidNotReceive().ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task LogDiario_AcumulaEntreLotesDelMismoDia()
-    {
-        using var escenario = new Worker2Escenario();
-        escenario.CrearPdfEnProcesar("a.pdf");
-        var txt1 = escenario.CrearTxtLote("lote-1.txt");
-
-        var documento = Substitute.For<IDocumentoProcesamientoService>();
-        documento.ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Exito());
-
-        var servicio = escenario.CrearServicio(documento);
-        await servicio.ProcesarLoteAsync(txt1, CancellationToken.None);
-
-        escenario.CrearPdfEnProcesar("b.pdf");
-        escenario.CrearPdfEnProcesar("c.pdf");
-        var txt2 = escenario.CrearTxtLote("lote-2.txt");
-        await servicio.ProcesarLoteAsync(txt2, CancellationToken.None);
-
     }
 }

@@ -139,7 +139,6 @@ public static class Worker2IntegracionHelper
         var trazabilidad = new TrazabilidadSqlService(
             Options.Create(Config.GetSection("TrazabilidadSql").Get<TrazabilidadSqlSettings>() ?? new TrazabilidadSqlSettings()),
             NullLogger<TrazabilidadSqlService>.Instance);
-        var logDiario = new LogDiarioService(NullLogger<LogDiarioService>.Instance);
         var openAi = openAiOverride ?? CrearOpenAiReal();
         var email = emailOverride ?? new EmailNotificationService(
             Options.Create(Config.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings()),
@@ -156,7 +155,6 @@ public static class Worker2IntegracionHelper
             openAi,
             email,
             trazabilidad,
-            logDiario,
             redDisponible,
             fileSettings,
             NullLogger<LoteProcesamientoService>.Instance);

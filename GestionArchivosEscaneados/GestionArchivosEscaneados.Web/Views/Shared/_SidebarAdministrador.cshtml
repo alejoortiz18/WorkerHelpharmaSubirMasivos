@@ -1,0 +1,19 @@
+@using GestionArchivosEscaneados.Constants
+@{
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var esCalendario = controller.Equals("Home", StringComparison.OrdinalIgnoreCase)
+        || controller.Equals("Documentos", StringComparison.OrdinalIgnoreCase);
+    var esTransacciones = controller.Equals("Transacciones", StringComparison.OrdinalIgnoreCase);
+}
+<aside class="app-sidebar">
+    <nav class="app-sidebar-nav">
+        <a class="app-sidebar-link @(esCalendario ? "active" : "")"
+           asp-controller="Home" asp-action="Index">
+            @EtiquetasUi.Calendario
+        </a>
+        <a class="app-sidebar-link @(esTransacciones ? "active" : "")"
+           asp-controller="Transacciones" asp-action="Index">
+            @EtiquetasUi.Transacciones
+        </a>
+    </nav>
+</aside>

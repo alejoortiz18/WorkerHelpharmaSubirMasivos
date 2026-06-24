@@ -56,6 +56,13 @@ public interface ITrazabilidadConsultaSqlService
         string valor,
         string? descripcion = null,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> ListarUsuariosConEscaneosAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DocumentoProcesadoConsulta>> ListarDocumentosProcesadosAsync(
+        string nombreUsuario,
+        string fecha,
+        CancellationToken cancellationToken = default);
 }
 
 public class TrazabilidadConsultaSqlService : ITrazabilidadConsultaSqlService
@@ -535,6 +542,88 @@ END
             });
 
         return true;
+    }
+
+    public async Task<IReadOnlyList<string>> ListarUsuariosConEscaneosAsync(
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT DISTINCT u.NombreUsuario
+FROM dbo.Usuarios u
+INNER JOIN dbo.FechasProcesamiento fp ON fp.UsuarioId = u.UsuarioId
+ORDER BY u.NombreUsuario;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var usuarios = new List<string>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    usuarios.Add(reader.GetString(0));
+
+                return (IReadOnlyList<string>)usuarios;
+            },
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DocumentoProcesadoConsulta>> ListarDocumentosProcesadosAsync(
+        string nombreUsuario,
+        string fecha,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    dp.DocumentoProcesadoId,
+    dp.NombreArchivo,
+    dp.Soporte,
+    dp.IdPaciente,
+    dp.IdBodega,
+    dp.IdCartera,
+    dp.FechaFactura,
+    dp.Procesado,
+    dp.FechaCreacion
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE u.NombreUsuario = @NombreUsuario
+  AND fp.FechaProcesamiento = @FechaProcesamiento
+ORDER BY dp.NombreArchivo;
+""";
+
+        var fechaDate = ParseFecha(fecha);
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var documentos = new List<DocumentoProcesadoConsulta>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    documentos.Add(new DocumentoProcesadoConsulta
+                    {
+                        DocumentoProcesadoId = reader.GetInt64(0),
+                        NombreArchivo = reader.GetString(1),
+                        Soporte = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        IdPaciente = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                        IdBodega = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        IdCartera = reader.IsDBNull(5) ? null : reader.GetString(5),
+                        FechaFactura = reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                        Procesado = !reader.IsDBNull(7) && reader.GetBoolean(7),
+                        FechaCreacion = reader.GetDateTime(8)
+                    });
+                }
+
+                return (IReadOnlyList<DocumentoProcesadoConsulta>)documentos;
+            },
+            cancellationToken,
+            command =>
+            {
+                command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim());
+                command.Parameters.Add("@FechaProcesamiento", System.Data.SqlDbType.Date).Value =
+                    fechaDate.ToDateTime(TimeOnly.MinValue);
+            });
     }
 
     private async Task EjecutarNonQueryAsync(

@@ -8,11 +8,15 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="app-body">
+    @{
+        var usuario = Context.Session.GetString(GestionArchivosEscaneados.Constants.SessionKeys.Usuario);
+        var esAdministrador = GestionArchivosEscaneados.Constants.AdministradorPortal.EsAdministrador(usuario);
+    }
     <header class="app-header shadow-sm">
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container-fluid">
                 <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">@GestionArchivosEscaneados.Constants.EtiquetasUi.TituloApp</a>
-                @if (Context.Session.GetString(GestionArchivosEscaneados.Constants.SessionKeys.Usuario) is string usuario)
+                @if (usuario is not null)
                 {
                     <div class="d-flex align-items-center gap-3">
                         <span class="text-white-50 small">@usuario</span>
@@ -25,9 +29,21 @@
             </div>
         </nav>
     </header>
-    <main class="container-fluid app-main py-4">
-        @RenderBody()
-    </main>
+    @if (esAdministrador)
+    {
+        <div class="app-shell-admin">
+            @await Html.PartialAsync("_SidebarAdministrador")
+            <main class="app-main app-main-admin py-4">
+                @RenderBody()
+            </main>
+        </div>
+    }
+    else
+    {
+        <main class="container-fluid app-main py-4">
+            @RenderBody()
+        </main>
+    }
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)

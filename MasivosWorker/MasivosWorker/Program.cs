@@ -43,7 +43,6 @@ builder.Services.AddSoporteHelpharmaIntegracion(builder.Configuration);
 builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<RedDisponibleService>();
 builder.Services.AddSingleton<FileManagerInfraestructure>();
-builder.Services.AddSingleton<LogDiarioService>();
 builder.Services.AddSingleton<DocumentoProcesamientoService>();
 builder.Services.AddSingleton<IDocumentoProcesamientoService>(sp =>
     sp.GetRequiredService<DocumentoProcesamientoService>());
