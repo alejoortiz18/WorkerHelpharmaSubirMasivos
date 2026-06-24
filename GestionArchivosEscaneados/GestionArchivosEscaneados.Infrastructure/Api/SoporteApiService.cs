@@ -49,6 +49,15 @@ public class SoporteApiService
                 return null;
             }
 
+            if (string.IsNullOrWhiteSpace(contenido))
+            {
+                _logger.LogError(
+                    "ApiSoporteError | Soporte={Soporte} | Status={Status} | Respuesta=vacia",
+                    soporteConsulta,
+                    response.StatusCode);
+                return null;
+            }
+
             return JsonSerializer.Deserialize<SoporteResponseDto>(contenido,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }

@@ -253,6 +253,8 @@
                     return { skipped: true };
                 }
 
+                marcarFilaReprocesada(row);
+
                 const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
                 const payload = new FormData();
                 payload.append('__RequestVerificationToken', token);
@@ -278,6 +280,22 @@
                 const result = await response.json();
                 updateProgress(index, total);
                 return { skipped: false, estado: result.estado, exito: !!result.exito };
+            }
+
+            function marcarFilaReprocesada(row) {
+                if (!row || row.dataset.intentoPrevio === 'true') return;
+
+                row.classList.add('is-reprocessed');
+                row.dataset.intentoPrevio = 'true';
+
+                const meta = row.querySelector('.docs-file-meta');
+                if (!meta || meta.querySelector('.docs-badge-reprocessed')) return;
+
+                const badge = document.createElement('span');
+                badge.className = 'badge rounded-pill docs-badge-reprocessed';
+                badge.title = 'Este soporte ya fue reprocesado';
+                badge.textContent = 'Reprocesado';
+                meta.appendChild(badge);
             }
 
             function selectRow(row, focusBarcode) {

@@ -508,6 +508,27 @@ html, body {
     max-height: 70vh;
 }
 
+.tx-fechas-table th,
+.tx-fechas-table td {
+    white-space: nowrap;
+}
+
+.tx-fechas-table th:first-child,
+.tx-fechas-table td:first-child {
+    padding-right: 2rem;
+}
+
+.tx-fechas-table th:nth-child(2),
+.tx-fechas-table td:nth-child(2) {
+    padding-right: 1rem;
+}
+
+.tx-fechas-table .tx-fechas-action-col {
+    width: 1%;
+    padding-left: 0;
+    color: #6c757d;
+}
+
 .tx-filter-row th {
     background: #fff;
     padding: .35rem .5rem;

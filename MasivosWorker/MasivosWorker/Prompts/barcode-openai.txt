@@ -1,16 +1,37 @@
-Lee el documento PDF adjunto completo.
+El PDF puede contener múltiples páginas o documentos escaneados.
 
-Tu tarea: localizar el código de barras del SOPORTE/FACTURA e identificar el texto legible impreso justo DEBAJO de ese código de barras.
+OBJETIVO:
+Analiza EXCLUSIVAMENTE la PÁGINA 1.
 
-El código de soporte SIEMPRE empieza con una o más LETRAS seguidas de números (ejemplos: FE249758, KI434411, FBO79606, KV351697).
+INSTRUCCIONES CRÍTICAS:
 
-Reglas estrictas:
-- Devuelve ÚNICAMENTE el código que tenga prefijo de letras seguido de números.
-- Si el texto visible del soporte tiene guion (por ejemplo DI-678430), CONSÉRVALO en la respuesta.
-- Si el texto visible no tiene guion, NO inventes uno.
-- IGNORA por completo los códigos de barras que sean solo números (por ejemplo el NIT de la empresa como 900277244 o 9002772444). Esos NO son el soporte.
-- Si hay varios códigos de barras, elige el que tenga letras al inicio; nunca el numérico.
-- NO leas las barras del código de barras; solo el texto humano visible debajo.
-- Elimina caracteres especiales visibles como * pero NO elimines el guion si forma parte del soporte.
-- Responde UNA sola línea con ese texto, sin explicaciones ni espacios adicionales.
-- Si no hay ningún código con prefijo de letras visible o no puedes leerlo con certeza, responde exactamente: NO_BARCODE
+1. Busca todos los códigos de barras visibles en la página 1.
+2. Para cada código de barras, identifica el texto humano impreso DIRECTAMENTE DEBAJO del código.
+3. "Directamente debajo" significa la línea centrada bajo las barras, separada por un pequeño espacio vertical y alineada con el ancho del código de barras.
+4. NO uses textos que estén:
+   - a la izquierda,
+   - a la derecha,
+   - encima,
+   - en tablas,
+   - en encabezados,
+   - cerca del código pero fuera de la línea inmediatamente inferior.
+5. NO interpretes ni decodifiques las barras.
+6. NO uses OCR de otras zonas del documento para completar el valor.
+7. Si existe un código de barras cuyo texto inferior comienza por letras seguidas de números, ese es el SOPORTE.
+8. Devuelve EXACTAMENTE el texto visible bajo ese código de barras.
+9. Conserva guiones si aparecen impresos.
+10. Elimina únicamente caracteres decorativos como *.
+11. Ignora completamente códigos numéricos puros (NIT, cédulas, consecutivos, etc.).
+12. Ignora por completo las páginas 2 en adelante.
+
+VALIDACIÓN OBLIGATORIA:
+- El resultado debe provenir de la línea inmediatamente debajo del código de barras seleccionado.
+- Si el texto debajo del código es "IP-401970", la respuesta debe ser exactamente "IP-401970".
+- No reemplaces el valor por otros textos cercanos como "FEMI401970".
+- No utilices números o códigos que no estén impresos justo debajo de las barras.
+
+SALIDA:
+Devuelve únicamente el texto encontrado debajo del código de barras, en UNA sola línea, sin explicaciones ni descripciones.
+Si no existe un código con prefijo alfabético debajo de las barras, responde exactamente:
+
+NO_BARCODE

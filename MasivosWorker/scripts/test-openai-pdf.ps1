@@ -60,7 +60,7 @@ $body = @{
             role    = "user"
             content = @(
                 @{ type = "text"; text = $prompt },
-                @{ type = "file"; file = @{ filename = $fileName; file_data = "data:application/pdf;base64,$pdfBase64" } }
+                @{ type = "file"; file = @{ filename = "documento.pdf"; file_data = "data:application/pdf;base64,$pdfBase64" } }
             )
         }
     )

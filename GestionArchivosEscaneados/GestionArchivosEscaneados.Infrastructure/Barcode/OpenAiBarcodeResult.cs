@@ -13,5 +13,8 @@ public sealed class OpenAiBarcodeResult
 
     public string? Codigo { get; init; }
 
+    /// <summary>Texto crudo devuelto por OpenAI antes de normalizar.</summary>
+    public string? RespuestaCruda { get; set; }
+
     public string? ErrorMensaje { get; init; }
 }

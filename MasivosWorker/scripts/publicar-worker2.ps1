@@ -1,7 +1,7 @@
 # Publica Worker 2 y aplica credenciales NAS desde appsettings.Production.local.json
 param(
     [string]$Destino = "C:\Users\alejandro.ortiz\Documents\helpharma\Desarrollos\publicaciones\Soporte Masivos\Worker2",
-    [string]$DestinoServicio = "C:\servicios\Worker2",
+    [string]$DestinoServicio = "C:\Servicios\MasivosWorker",
     [string]$CredencialesLocales = "$PSScriptRoot\appsettings.Production.local.json"
 )
 
@@ -78,6 +78,13 @@ if ($faltantes.Count -gt 0) {
 }
 
 $config | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $Destino "appsettings.json") -Encoding UTF8
+
+$promptsOrigen = Join-Path (Split-Path $PSScriptRoot -Parent) "MasivosWorker\Prompts"
+$promptsDestino = Join-Path $Destino "Prompts"
+New-Item -ItemType Directory -Force -Path $promptsDestino | Out-Null
+Copy-Item (Join-Path $promptsOrigen "*") $promptsDestino -Recurse -Force
+Write-Host "Prompts OpenAI copiados a $promptsDestino"
+
 Write-Host "Worker 2 publicado en: $Destino"
 
 if ($DestinoServicio -and (Test-Path $DestinoServicio)) {

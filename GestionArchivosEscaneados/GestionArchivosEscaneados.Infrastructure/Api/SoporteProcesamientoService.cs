@@ -41,7 +41,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
 
         var soporteConsulta = soporte.Trim();
 
-        var respuesta = await _soporteApi.EnviarSoporteAsync(soporteConsulta);
+        var (respuesta, soporteResuelto) = await ConsultarDatosSoporteAsync(soporteConsulta, cancellationToken);
         if (respuesta == null)
         {
             return new SoporteProcesamientoResult
@@ -54,7 +54,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         cancellationToken.ThrowIfCancellationRequested();
 
         var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-            soporteConsulta,
+            soporteResuelto,
             contenidoPdf,
             nombreArchivo,
             respuesta,
@@ -65,21 +65,47 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiFisico,
-                Soporte = soporteConsulta,
+                Soporte = soporteResuelto,
                 Datos = respuesta
             };
         }
 
         _logger.LogInformation(
             "SoporteProcesamientoOK | Soporte={Soporte} | Usuario={Usuario}",
-            soporteConsulta,
+            soporteResuelto,
             idUsuario);
 
         return new SoporteProcesamientoResult
         {
             Estado = SoporteProcesamientoEstado.Exito,
-            Soporte = soporteConsulta,
+            Soporte = soporteResuelto,
             Datos = respuesta
         };
+    }
+
+    private async Task<(SoporteResponseDto? Datos, string SoporteResuelto)> ConsultarDatosSoporteAsync(
+        string soporteConsulta,
+        CancellationToken cancellationToken)
+    {
+        foreach (var candidato in SoporteCodigoOcrHelper.VariantesConfusionI1(soporteConsulta).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var respuesta = await _soporteApi.EnviarSoporteAsync(candidato);
+            if (respuesta == null)
+                continue;
+
+            if (!string.Equals(candidato, soporteConsulta, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation(
+                    "ApiSoporteOcrCorreccion | SoporteLeido={SoporteLeido} | SoporteResuelto={SoporteResuelto}",
+                    soporteConsulta,
+                    candidato);
+            }
+
+            return (respuesta, candidato);
+        }
+
+        return (null, soporteConsulta);
     }
 }

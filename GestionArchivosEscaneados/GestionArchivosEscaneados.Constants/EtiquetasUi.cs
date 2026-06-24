@@ -44,6 +44,7 @@ public static class EtiquetasUi
     public const string VolverUsuarios = "Volver a usuarios";
     public const string VolverFechas = "Volver a fechas";
     public const string TotalArchivos = "Total archivos";
+    public const string TotalEscaneo = "Total escaneo";
     public const string FilasPorPagina = "Filas por página";
     public const string Pagina = "Página";
     public const string De = "de";

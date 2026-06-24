@@ -20,6 +20,29 @@ namespace GestionArchivosEscaneados.Tests.Application;
 public class ReprocesoAppServiceTests
 {
     [Fact]
+    public async Task ReprocesarAsync_MarcaIntentoPrevioAntesDeLeerBarcode()
+    {
+        var (service, root, _, _) = CrearServicio();
+        try
+        {
+            var usuario = "alejandro.ortiz";
+            var fecha = "2026-06-04";
+            var nombreArchivo = "marcador.pdf";
+            CrearPdfNoProcesado(root, usuario, fecha, nombreArchivo);
+
+            await service.ReprocesarAsync(usuario, fecha, nombreArchivo, string.Empty);
+
+            var marcador = Path.Combine(root, usuario, fecha, "noprocesados", nombreArchivo + ".attempt");
+            File.Exists(marcador).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ReprocesarAsync_CuandoBarcodeFalla_UsaOpenAiYFlujoMasivosWorker()
     {
         var (service, root, handler, _) = CrearServicio();
@@ -108,13 +131,11 @@ public class ReprocesoAppServiceTests
                 {
                     new DocumentoPendiente
                     {
-                        NombreArchivo = "visible.pdf",
-                        TieneIntentoPrevio = false
+                        NombreArchivo = "visible.pdf"
                     },
                     new DocumentoPendiente
                     {
-                        NombreArchivo = "fantasma.pdf",
-                        TieneIntentoPrevio = true
+                        NombreArchivo = "fantasma.pdf"
                     }
                 });
 
@@ -122,6 +143,7 @@ public class ReprocesoAppServiceTests
 
             archivos.Should().ContainSingle();
             archivos[0].NombreArchivo.Should().Be("visible.pdf");
+            archivos[0].TieneIntentoPrevio.Should().BeFalse();
         }
         finally
         {

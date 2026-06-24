@@ -105,7 +105,7 @@ public class TransaccionesFechasViewModel
 {
     public string Usuario { get; set; } = string.Empty;
 
-    public IReadOnlyList<string> Fechas { get; set; } = [];
+    public IReadOnlyList<FechaEscaneoResumen> Fechas { get; set; } = [];
 }
 
 public class TransaccionesDocumentosViewModel

@@ -44,6 +44,11 @@ public class UncStorageService
     public RutasDiaContext ObtenerRutasDia(string usuario, string fecha) =>
         RutasDiaHelper.Resolver(_rutas, usuario, fecha);
 
+    public Task<T> EjecutarConAccesoAsync<T>(
+        Func<CancellationToken, Task<T>> operacion,
+        CancellationToken cancellationToken = default) =>
+        _uncConexion.EjecutarConAccesoAsync(operacion, cancellationToken);
+
     public IReadOnlyList<ArchivoNoProcesado> ListarNoProcesados(string usuario, string fecha) =>
         _uncConexion.EjecutarConAcceso(() =>
         {

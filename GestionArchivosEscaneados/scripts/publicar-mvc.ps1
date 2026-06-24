@@ -39,6 +39,12 @@ else {
 
 $config | ConvertTo-Json -Depth 10 | Set-Content $appsettingsDestino -Encoding UTF8
 
+$promptsOrigen = Join-Path $repoRoot "GestionArchivosEscaneados.Web\Prompts"
+$promptsDestino = Join-Path $Destino "Prompts"
+New-Item -ItemType Directory -Force -Path $promptsDestino | Out-Null
+Copy-Item (Join-Path $promptsOrigen "*") $promptsDestino -Recurse -Force
+Write-Host "Prompts OpenAI copiados a $promptsDestino"
+
 Write-Host ""
 Write-Host "Listo. Pasos en IIS (como administrador):"
 Write-Host "  1. Sitio -> Ruta fisica = $Destino"

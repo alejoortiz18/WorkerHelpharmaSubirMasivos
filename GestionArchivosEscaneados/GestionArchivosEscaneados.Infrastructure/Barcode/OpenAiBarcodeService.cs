@@ -12,11 +12,8 @@ namespace GestionArchivosEscaneados.Infrastructure.Barcode;
 
 public class OpenAiBarcodeService : IOpenAiBarcodeService
 {
-    private const string DefaultPrompt =
-        "Analiza el PDF adjunto y devuelve únicamente el código de barras del documento.\n" +
-        "Respeta el formato original del soporte. Si el texto visible tiene guion, devuélvelo con guion. Si no tiene guion, devuélvelo sin guion.\n" +
-        "Responde solo con el código del soporte, sin espacios y sin explicación.\n" +
-        "Si no puedes identificar un código válido, responde exactamente NO_BARCODE.";
+    /// <summary>Nombre neutro enviado a OpenAI para evitar filtrar pistas desde el nombre del archivo UNC.</summary>
+    internal const string NombreArchivoNeutroOpenAi = "documento.pdf";
 
     private static readonly Regex CodigoValido =
         new(@"^([A-Z]+)-?(\d+)$", RegexOptions.Compiled);
@@ -96,8 +93,14 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
             try
             {
-                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, nombreArchivo, prompt, cancellationToken);
+                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, prompt, cancellationToken);
                 var resultado = InterpretarRespuesta(respuestaTexto);
+                resultado.RespuestaCruda = respuestaTexto?.Trim();
+
+                _logger.LogInformation(
+                    "OpenAiRespuestaCruda | Archivo={Archivo} | Texto={Texto}",
+                    nombreArchivo,
+                    respuestaTexto ?? "-");
 
                 _logger.LogInformation(
                     "OpenAiResultado | Archivo={Archivo} | Modelo={Modelo} | Tipo={Tipo} | Codigo={Codigo}",
@@ -135,7 +138,11 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
         if (string.Equals(limpio, "NO_BARCODE", StringComparison.OrdinalIgnoreCase))
         {
-            return new OpenAiBarcodeResult { Tipo = OpenAiBarcodeResultKind.NoBarcode };
+            return new OpenAiBarcodeResult
+            {
+                Tipo = OpenAiBarcodeResultKind.NoBarcode,
+                RespuestaCruda = limpio
+            };
         }
 
         var codigo = limpio
@@ -146,19 +153,23 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
         var match = CodigoValido.Match(codigo);
         if (!match.Success)
         {
-            return new OpenAiBarcodeResult { Tipo = OpenAiBarcodeResultKind.NoBarcode };
+            return new OpenAiBarcodeResult
+            {
+                Tipo = OpenAiBarcodeResultKind.NoBarcode,
+                RespuestaCruda = limpio
+            };
         }
 
         return new OpenAiBarcodeResult
         {
             Tipo = OpenAiBarcodeResultKind.CodigoEncontrado,
-            Codigo = codigo
+            Codigo = codigo,
+            RespuestaCruda = limpio
         };
     }
 
     private async Task<string?> EnviarSolicitudAsync(
         byte[] pdfBytes,
-        string nombreArchivo,
         string prompt,
         CancellationToken cancellationToken)
     {
@@ -184,7 +195,7 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
                             type = "file",
                             file = new
                             {
-                                filename = nombreArchivo,
+                                filename = NombreArchivoNeutroOpenAi,
                                 file_data = $"data:application/pdf;base64,{pdfBase64}"
                             }
                         }
@@ -208,60 +219,56 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
         return parsed?.Choices?.FirstOrDefault()?.Message?.Content;
     }
 
-    private async Task<string?> CargarPromptAsync(CancellationToken cancellationToken)
+    private Task<string> CargarPromptAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (_promptCargado && _prompt != null)
-            return _prompt;
+            return Task.FromResult(_prompt);
 
-        // Intentar cargar desde BD
-        var promptEnBd = await _configuraciones.ObtenerValorAsync(
-            "OpenAi:PromptBarcode",
-            string.Empty,
-            cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(promptEnBd))
-        {
-            _prompt = promptEnBd;
-            _promptCargado = true;
-            _logger.LogInformation("OpenAiPromptCargadoDeBaseDatos");
-            return _prompt;
-        }
-
-        // Fallback: cargar desde archivo
         var promptDeArchivo = CargarPromptDeArchivo(_settings.PromptResourcePath);
         _prompt = promptDeArchivo;
         _promptCargado = true;
 
-        // Si se cargó desde archivo, guardar en BD para futuro
-        if (!string.IsNullOrWhiteSpace(promptDeArchivo))
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _configuraciones.GuardarAsync(
-                        "OpenAi:PromptBarcode",
-                        promptDeArchivo,
-                        "Prompt para detección de códigos de barras en OpenAI",
-                        CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "NoSeGuardoPromptEnBD");
-                }
-            }, CancellationToken.None);
-        }
+        _logger.LogInformation(
+            "OpenAiPromptCargadoDeArchivo | Caracteres={Caracteres} | Inicio={Inicio}",
+            _prompt.Length,
+            _prompt.Split('\n')[0].Trim());
 
-        return _prompt;
+        SincronizarPromptEnBd(_prompt);
+        return Task.FromResult(_prompt);
     }
 
-    private static string? CargarPromptDeArchivo(string promptResourcePath)
+    private void SincronizarPromptEnBd(string promptDeArchivo)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _configuraciones.GuardarAsync(
+                    "OpenAi:PromptBarcode",
+                    promptDeArchivo,
+                    "Prompt para detección de códigos de barras en OpenAI",
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "NoSeGuardoPromptEnBD");
+            }
+        }, CancellationToken.None);
+    }
+
+    private static string CargarPromptDeArchivo(string promptResourcePath)
     {
         var ruta = Path.IsPathRooted(promptResourcePath)
             ? promptResourcePath
             : Path.Combine(AppContext.BaseDirectory, promptResourcePath);
 
-        return File.Exists(ruta) ? File.ReadAllText(ruta) : DefaultPrompt;
+        if (!File.Exists(ruta))
+            throw new FileNotFoundException(
+                $"Prompt OpenAI no encontrado. Debe existir Prompts/barcode-openai.txt en: {ruta}");
+
+        return File.ReadAllText(ruta, System.Text.Encoding.UTF8).TrimEnd();
     }
 
     private sealed class OpenAiChatResponse

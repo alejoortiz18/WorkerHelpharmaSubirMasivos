@@ -59,6 +59,10 @@ public interface ITrazabilidadConsultaSqlService
 
     Task<IReadOnlyList<string>> ListarUsuariosConEscaneosAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasConTotalEscaneoAsync(
+        string nombreUsuario,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<DocumentoProcesadoConsulta>> ListarDocumentosProcesadosAsync(
         string nombreUsuario,
         string fecha,
@@ -244,6 +248,43 @@ ORDER BY fp.FechaProcesamiento DESC;
             command => command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim()));
     }
 
+    public async Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasConTotalEscaneoAsync(
+        string nombreUsuario,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    CONVERT(varchar(10), fp.FechaProcesamiento, 23) AS Fecha,
+    COUNT(dp.DocumentoProcesadoId) AS TotalEscaneo
+FROM dbo.FechasProcesamiento fp
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+LEFT JOIN dbo.DocumentosProcesados dp ON dp.FechaProcesamientoId = fp.FechaProcesamientoId
+WHERE u.NombreUsuario = @NombreUsuario
+GROUP BY fp.FechaProcesamiento
+ORDER BY fp.FechaProcesamiento DESC;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var fechas = new List<FechaEscaneoResumen>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    fechas.Add(new FechaEscaneoResumen
+                    {
+                        Fecha = reader.GetString(0),
+                        TotalEscaneo = reader.GetInt32(1)
+                    });
+                }
+
+                return (IReadOnlyList<FechaEscaneoResumen>)fechas;
+            },
+            cancellationToken,
+            command => command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim()));
+    }
+
     public async Task<bool> FechaExisteAsync(string nombreUsuario, string fecha, CancellationToken cancellationToken = default)
     {
         const string sql = """
@@ -319,7 +360,6 @@ WHERE u.NombreUsuario = @NombreUsuario
         const string sql = """
 SELECT
     dp.NombreArchivo,
-    CASE WHEN dp.Soporte IS NULL OR LTRIM(RTRIM(dp.Soporte)) = N'' THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END AS TieneIntentoPrevio,
     dp.FechaFactura
 FROM dbo.DocumentosProcesados dp
 INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
@@ -342,8 +382,7 @@ ORDER BY dp.NombreArchivo;
                     documentos.Add(new DocumentoPendiente
                     {
                         NombreArchivo = reader.GetString(0),
-                        TieneIntentoPrevio = reader.GetBoolean(1),
-                        FechaFactura = reader.IsDBNull(2) ? null : reader.GetDateTime(2)
+                        FechaFactura = reader.IsDBNull(1) ? null : reader.GetDateTime(1)
                     });
                 }
 

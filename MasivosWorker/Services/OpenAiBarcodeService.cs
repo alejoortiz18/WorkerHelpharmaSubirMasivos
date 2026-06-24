@@ -11,6 +11,8 @@ namespace Services;
 
 public class OpenAiBarcodeService : IOpenAiBarcodeService
 {
+    internal const string NombreArchivoNeutroOpenAi = "documento.pdf";
+
     private static readonly Regex CodigoValido =
         new(@"^([A-Z]+)-?(\d+)$", RegexOptions.Compiled);
 
@@ -85,8 +87,13 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
             try
             {
-                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, nombreArchivo, cancellationToken);
+                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, cancellationToken);
                 var resultado = InterpretarRespuesta(respuestaTexto);
+
+                _logger.LogInformation(
+                    "OpenAiRespuestaCruda | Archivo={Archivo} | Texto={Texto}",
+                    nombreArchivo,
+                    respuestaTexto ?? "-");
 
                 _logger.LogInformation(
                     "OpenAiResultado | Archivo={Archivo} | Modelo={Modelo} | Tipo={Tipo} | Codigo={Codigo}",
@@ -155,7 +162,6 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
     private async Task<string?> EnviarSolicitudAsync(
         byte[] pdfBytes,
-        string nombreArchivo,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
@@ -180,7 +186,7 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
                             type = "file",
                             file = new
                             {
-                                filename = nombreArchivo,
+                                filename = NombreArchivoNeutroOpenAi,
                                 file_data = $"data:application/pdf;base64,{pdfBase64}"
                             }
                         }

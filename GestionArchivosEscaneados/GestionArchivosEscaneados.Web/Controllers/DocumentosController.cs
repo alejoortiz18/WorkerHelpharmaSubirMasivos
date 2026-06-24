@@ -257,7 +257,7 @@ public class DocumentosController : Controller
                     FechaFactura = a.FechaFactura,
                     CodigoBarras = previo?.CodigoBarras ?? string.Empty,
                     ErrorProceso = previo?.ErrorProceso ?? false,
-                    TieneIntentoPrevio = a.TieneIntentoPrevio || previo?.TieneIntentoPrevio == true
+                    TieneIntentoPrevio = a.TieneIntentoPrevio
                 };
             }).ToList(),
             MensajeExito = mensajeExito,

@@ -1,0 +1,11 @@
+{
+  "name": "e2e-visible-reproceso",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "reproceso": "node reproceso-visible.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  }
+}

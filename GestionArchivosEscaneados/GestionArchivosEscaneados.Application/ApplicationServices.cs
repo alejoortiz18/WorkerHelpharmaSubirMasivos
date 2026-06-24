@@ -121,7 +121,7 @@ public class ReprocesoAppService
                     NombreArchivo = archivo.NombreArchivo,
                     Fecha = archivo.Fecha,
                     RutaCompleta = archivo.RutaCompleta,
-                    TieneIntentoPrevio = archivo.TieneIntentoPrevio || pendiente?.TieneIntentoPrevio == true,
+                    TieneIntentoPrevio = archivo.TieneIntentoPrevio,
                     FechaFactura = pendiente?.FechaFactura
                 };
             }).ToList();
@@ -224,7 +224,7 @@ public class ReprocesoAppService
         }
 
         var rutaPdf = _unc.ResolverRutaPdfSegura(usuario, fecha, nombreArchivo);
-        if (string.IsNullOrWhiteSpace(rutaPdf) || !File.Exists(rutaPdf))
+        if (string.IsNullOrWhiteSpace(rutaPdf))
         {
             _logger.LogWarning(
                 "ReprocesoPdfNoEncontrado | Usuario={Usuario} | Fecha={Fecha} | Archivo={Archivo}",
@@ -234,44 +234,56 @@ public class ReprocesoAppService
             return SoporteProcesamientoEstado.FalloApiDatos;
         }
 
-        var codigoDetectado = await LeerCodigoBarrasAsync(rutaPdf, cancellationToken);
-        if (string.IsNullOrWhiteSpace(codigoDetectado))
+        _unc.MarcarIntentoPrevio(usuario, fecha, nombreArchivo);
+
+        var lectura = await _unc.EjecutarConAccesoAsync(async ct =>
         {
-            _logger.LogInformation(
-                "ReprocesoBarcodeNoDetectado | Archivo={Archivo} | Accion=EnviarOpenAI",
-                nombreArchivo);
-
-            var resultadoOpenAi = await _openAiBarcodeService.LeerCodigoAsync(rutaPdf, cancellationToken);
-            _logger.LogInformation(
-                "ReprocesoOpenAiResultado | Archivo={Archivo} | Tipo={Tipo} | Codigo={Codigo}",
-                nombreArchivo,
-                resultadoOpenAi.Tipo,
-                resultadoOpenAi.Codigo ?? "-");
-
-            switch (resultadoOpenAi.Tipo)
+            var codigoDetectado = await LeerCodigoBarrasAsync(rutaPdf, ct);
+            if (string.IsNullOrWhiteSpace(codigoDetectado))
             {
-                case OpenAiBarcodeResultKind.CodigoEncontrado:
-                    codigoDetectado = resultadoOpenAi.Codigo;
-                    break;
-                case OpenAiBarcodeResultKind.NoBarcode:
-                    return SoporteProcesamientoEstado.FalloBarcode;
-                case OpenAiBarcodeResultKind.ErrorServicio:
-                default:
-                    return SoporteProcesamientoEstado.FalloOpenAi;
+                _logger.LogInformation(
+                    "ReprocesoBarcodeNoDetectado | Archivo={Archivo} | Accion=EnviarOpenAI",
+                    nombreArchivo);
+
+                var resultadoOpenAi = await _openAiBarcodeService.LeerCodigoAsync(rutaPdf, ct);
+                _logger.LogInformation(
+                    "ReprocesoOpenAiResultado | Archivo={Archivo} | Tipo={Tipo} | Codigo={Codigo}",
+                    nombreArchivo,
+                    resultadoOpenAi.Tipo,
+                    resultadoOpenAi.Codigo ?? "-");
+
+                switch (resultadoOpenAi.Tipo)
+                {
+                    case OpenAiBarcodeResultKind.CodigoEncontrado:
+                        codigoDetectado = resultadoOpenAi.Codigo;
+                        break;
+                    case OpenAiBarcodeResultKind.NoBarcode:
+                        return new LecturaPdfReproceso { FalloTemprano = SoporteProcesamientoEstado.FalloBarcode };
+                    case OpenAiBarcodeResultKind.ErrorServicio:
+                    default:
+                        return new LecturaPdfReproceso { FalloTemprano = SoporteProcesamientoEstado.FalloOpenAi };
+                }
             }
-        }
-        else
-        {
-            _logger.LogInformation(
-                "ReprocesoBarcodeDetectado | Archivo={Archivo} | Codigo={Codigo}",
-                nombreArchivo,
-                codigoDetectado);
-        }
+            else
+            {
+                _logger.LogInformation(
+                    "ReprocesoBarcodeDetectado | Archivo={Archivo} | Codigo={Codigo}",
+                    nombreArchivo,
+                    codigoDetectado);
+            }
 
-        if (string.IsNullOrWhiteSpace(codigoDetectado))
-            return SoporteProcesamientoEstado.FalloBarcode;
+            if (string.IsNullOrWhiteSpace(codigoDetectado))
+                return new LecturaPdfReproceso { FalloTemprano = SoporteProcesamientoEstado.FalloBarcode };
 
-        var pdf = await File.ReadAllBytesAsync(rutaPdf, cancellationToken);
+            var pdfBytes = await File.ReadAllBytesAsync(rutaPdf, ct);
+            return new LecturaPdfReproceso { Codigo = codigoDetectado, Pdf = pdfBytes };
+        }, cancellationToken);
+
+        if (lectura.FalloTemprano.HasValue)
+            return lectura.FalloTemprano.Value;
+
+        var codigoDetectado = lectura.Codigo!;
+        var pdf = lectura.Pdf!;
         _logger.LogInformation(
             "ReprocesoEnviarSoporte | Archivo={Archivo} | Codigo={Codigo} | Bytes={Bytes}",
             nombreArchivo,
@@ -389,6 +401,15 @@ public class ReprocesoAppService
 
         return null;
     }
+
+    private sealed class LecturaPdfReproceso
+    {
+        public string? Codigo { get; init; }
+
+        public byte[]? Pdf { get; init; }
+
+        public SoporteProcesamientoEstado? FalloTemprano { get; init; }
+    }
 }
 
 public class TransaccionesAppService
@@ -403,10 +424,10 @@ public class TransaccionesAppService
     public Task<IReadOnlyList<string>> ListarUsuariosAsync(CancellationToken cancellationToken = default) =>
         _trazabilidad.ListarUsuariosConEscaneosAsync(cancellationToken);
 
-    public Task<IReadOnlyList<string>> ListarFechasAsync(
+    public Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasAsync(
         string usuario,
         CancellationToken cancellationToken = default) =>
-        _trazabilidad.ListarFechasDisponiblesAsync(usuario, cancellationToken);
+        _trazabilidad.ListarFechasConTotalEscaneoAsync(usuario, cancellationToken);
 
     public async Task<IReadOnlyList<DocumentoProcesadoConsulta>> ListarDocumentosAsync(
         string usuario,
