@@ -41,6 +41,13 @@ public class CalendarioAppService
         CancellationToken cancellationToken = default) =>
         _trazabilidad.ListarFechasDisponiblesAsync(usuario, cancellationToken);
 
+    public Task<IReadOnlyList<CalendarioDiaResumen>> ObtenerResumenMesAsync(
+        string usuario,
+        int anio,
+        int mes,
+        CancellationToken cancellationToken = default) =>
+        _trazabilidad.ListarResumenCalendarioPorMesAsync(usuario, anio, mes, cancellationToken);
+
     public Task<bool> FechaExisteAsync(
         string usuario,
         string fecha,

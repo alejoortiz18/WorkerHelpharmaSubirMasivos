@@ -372,8 +372,8 @@ html, body {
 .calendar-cell {
     aspect-ratio: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
 }
 
 .calendar-day {
@@ -385,21 +385,82 @@ html, body {
     color: #495057;
     font-weight: 500;
     transition: transform .15s ease, box-shadow .15s ease;
+    padding: .35rem;
+    min-height: 0;
 }
 
 .calendar-day.available {
+    --calendar-day-font-size: 1.15rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    align-items: stretch;
+    justify-items: stretch;
     background: #e8f2ff;
     color: var(--brand-primary);
     cursor: pointer;
 }
 
-.calendar-day.available:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(13, 79, 139, .2);
+.calendar-day-number {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--calendar-day-font-size);
+    font-weight: 600;
+    line-height: 1.05;
+    color: var(--brand-primary);
+    text-align: center;
+}
+
+.calendar-day-stats {
+    display: contents;
+}
+
+.calendar-day-scanned {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--calendar-day-font-size);
+    font-weight: 600;
+    line-height: 1.05;
+    color: #198754;
+    text-align: center;
+    min-width: 0;
+    padding: 0 .1rem;
+}
+
+.calendar-day-pending {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--calendar-day-font-size);
+    font-weight: 600;
+    line-height: 1.05;
+    color: #dc3545;
+    text-align: center;
+    min-width: 0;
+    padding: 0 .1rem;
 }
 
 .calendar-day.disabled {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
     color: #ced4da;
+}
+
+.calendar-day.available:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 79, 139, .2);
 }
 
 .stat-card {

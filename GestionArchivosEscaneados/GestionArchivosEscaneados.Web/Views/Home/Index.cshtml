@@ -43,6 +43,7 @@
             {
                 var fecha = new DateTime(Model.Anio, Model.Mes, dia).ToString("yyyy-MM-dd");
                 var disponible = Model.FechasDisponibles.Contains(fecha);
+                Model.ResumenPorFecha.TryGetValue(fecha, out var resumen);
                 if (disponible)
                 {
                     <form asp-action="SeleccionarFecha" method="post" class="calendar-cell m-0">
@@ -50,7 +51,15 @@
                         <input type="hidden" name="anio" value="@Model.Anio" />
                         <input type="hidden" name="mes" value="@Model.Mes" />
                         <input type="hidden" name="dia" value="@dia" />
-                        <button type="submit" class="calendar-day available" title="@fecha">@dia</button>
+                        <button type="submit"
+                                class="calendar-day available"
+                                title="@fecha — @resumen?.TotalEscaneados escaneados, @resumen?.NoProcesados no procesados">
+                            <span class="calendar-day-number">@dia</span>
+                            <span class="calendar-day-stats">
+                                <span class="calendar-day-scanned">@(resumen?.TotalEscaneados ?? 0)</span>
+                                <span class="calendar-day-pending">@(resumen?.NoProcesados ?? 0)</span>
+                            </span>
+                        </button>
                     </form>
                 }
                 else

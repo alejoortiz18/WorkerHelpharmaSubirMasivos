@@ -20,6 +20,9 @@ public class CalendarioViewModel
 
     public HashSet<string> FechasDisponibles { get; set; } = [];
 
+    public Dictionary<string, CalendarioDiaResumen> ResumenPorFecha { get; set; } =
+        new(StringComparer.Ordinal);
+
     public string? Error { get; set; }
 }
 

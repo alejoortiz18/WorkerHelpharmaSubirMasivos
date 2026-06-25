@@ -29,6 +29,7 @@ public class HomeController : Controller
         if (mesSel > 12) { mesSel = 1; anioSel++; }
 
         var fechas = await _calendario.ObtenerFechasDisponiblesAsync(usuario, cancellationToken);
+        var resumenMes = await _calendario.ObtenerResumenMesAsync(usuario, anioSel, mesSel, cancellationToken);
 
         return View(new CalendarioViewModel
         {
@@ -36,6 +37,7 @@ public class HomeController : Controller
             Anio = anioSel,
             Mes = mesSel,
             FechasDisponibles = fechas.ToHashSet(StringComparer.Ordinal),
+            ResumenPorFecha = resumenMes.ToDictionary(r => r.Fecha, StringComparer.Ordinal),
             Error = error
         });
     }

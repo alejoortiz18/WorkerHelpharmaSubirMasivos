@@ -16,6 +16,12 @@ public interface ITrazabilidadConsultaSqlService
 
     Task<IReadOnlyList<string>> ListarFechasDisponiblesAsync(string nombreUsuario, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<CalendarioDiaResumen>> ListarResumenCalendarioPorMesAsync(
+        string nombreUsuario,
+        int anio,
+        int mes,
+        CancellationToken cancellationToken = default);
+
     Task<bool> FechaExisteAsync(string nombreUsuario, string fecha, CancellationToken cancellationToken = default);
 
     Task<ResumenLogDiario?> ObtenerResumenAsync(string nombreUsuario, string fecha, CancellationToken cancellationToken = default);
@@ -283,6 +289,54 @@ ORDER BY fp.FechaProcesamiento DESC;
             },
             cancellationToken,
             command => command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim()));
+    }
+
+    public async Task<IReadOnlyList<CalendarioDiaResumen>> ListarResumenCalendarioPorMesAsync(
+        string nombreUsuario,
+        int anio,
+        int mes,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    CONVERT(varchar(10), fp.FechaProcesamiento, 23) AS Fecha,
+    COUNT(dp.DocumentoProcesadoId) AS TotalEscaneados,
+    SUM(CASE WHEN dp.Procesado = 0 THEN 1 ELSE 0 END) AS NoProcesados
+FROM dbo.FechasProcesamiento fp
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+LEFT JOIN dbo.DocumentosProcesados dp ON dp.FechaProcesamientoId = fp.FechaProcesamientoId
+WHERE u.NombreUsuario = @NombreUsuario
+  AND YEAR(fp.FechaProcesamiento) = @Anio
+  AND MONTH(fp.FechaProcesamiento) = @Mes
+GROUP BY fp.FechaProcesamiento
+ORDER BY fp.FechaProcesamiento;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<CalendarioDiaResumen>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new CalendarioDiaResumen
+                    {
+                        Fecha = reader.GetString(0),
+                        TotalEscaneados = reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                        NoProcesados = reader.IsDBNull(2) ? 0 : reader.GetInt32(2)
+                    });
+                }
+
+                return (IReadOnlyList<CalendarioDiaResumen>)items;
+            },
+            cancellationToken,
+            command =>
+            {
+                command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim());
+                command.Parameters.AddWithValue("@Anio", anio);
+                command.Parameters.AddWithValue("@Mes", mes);
+            });
     }
 
     public async Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasConTotalEscaneoAsync(
