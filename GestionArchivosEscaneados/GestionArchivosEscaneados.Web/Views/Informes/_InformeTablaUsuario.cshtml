@@ -1,0 +1,47 @@
+@using GestionArchivosEscaneados.Constants
+@model (IReadOnlyList<GestionArchivosEscaneados.Models.Entities.UsuarioEscaneoTotal> Filas, int TotalReferencia)
+
+<section class="informes-panel shadow-sm">
+    <div class="informes-panel-head">
+        <h2 class="informes-panel-title">@EtiquetasUi.TotalPorUsuario</h2>
+        <span class="informes-panel-count">@Model.Filas.Count @EtiquetasUi.Registros</span>
+    </div>
+    @if (Model.Filas.Count == 0)
+    {
+        <div class="informes-empty">
+            <div class="informes-empty-title">@EtiquetasUi.SinDatosInforme</div>
+        </div>
+    }
+    else
+    {
+        var max = Model.Filas.Max(u => u.TotalEscaneo);
+        var referencia = Math.Max(1, max);
+        <div class="informes-table-wrap">
+            <table class="informes-table">
+                <thead>
+                    <tr>
+                        <th>@EtiquetasUi.Usuario</th>
+                        <th>@EtiquetasUi.TotalEscaneo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Filas.OrderByDescending(u => u.TotalEscaneo))
+                    {
+                        var pct = (int)Math.Round(item.TotalEscaneo * 100.0 / referencia);
+                        <tr>
+                            <td class="informes-user-cell">@item.NombreUsuario</td>
+                            <td class="informes-bar-cell">
+                                <div class="informes-bar-track">
+                                    <div class="informes-bar-bg">
+                                        <div class="informes-bar-fill" style="width: @(pct)%"></div>
+                                    </div>
+                                    <span class="informes-bar-value">@item.TotalEscaneo.ToString("N0")</span>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

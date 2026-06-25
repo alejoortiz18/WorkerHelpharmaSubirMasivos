@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
-using GestionArchivosEscaneados.Models.Settings;
+using GestionArchivosEscaneados.Constants;
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.Win32.SafeHandles;
 
 namespace GestionArchivosEscaneados.Infrastructure.Unc;
@@ -13,34 +13,33 @@ public class UncConexionService
     private const int Logon32LogonNewCredentials = 9;
     private const int Logon32ProviderWinnt50 = 3;
 
-    private readonly RutasSettings _rutas;
-    private readonly RedSettings _red;
+    private readonly IIntegracionConfigProvider _config;
     private readonly ILogger<UncConexionService> _logger;
     private bool _conexionWNetEstablecida;
+    private string? _ultimaRaizUnc;
+    private string? _ultimoUsuario;
+    private string? _ultimaClave;
 
     public UncConexionService(
-        IOptions<RutasSettings> rutas,
-        IOptions<RedSettings> red,
+        IIntegracionConfigProvider config,
         ILogger<UncConexionService> logger)
     {
-        _rutas = rutas.Value;
-        _red = red.Value;
+        _config = config;
         _logger = logger;
     }
 
     public string? UltimoErrorMensaje { get; private set; }
 
     public bool UsaCredenciales =>
-        _red.UsarCredencialesConfiguradas &&
-        !string.IsNullOrWhiteSpace(_red.Usuario) &&
-        !string.IsNullOrWhiteSpace(_red.Clave);
+        ResolverConfiguracion().UsarCredenciales;
 
     public bool AsegurarAccesoUnc() =>
         EjecutarConAcceso(() =>
         {
-            if (!Directory.Exists(_rutas.RaizUnc))
+            var raizUnc = ResolverConfiguracion().RaizUnc;
+            if (!Directory.Exists(raizUnc))
             {
-                UltimoErrorMensaje = $"No se puede acceder a {_rutas.RaizUnc}";
+                UltimoErrorMensaje = $"No se puede acceder a {raizUnc}";
                 return false;
             }
 
@@ -50,8 +49,9 @@ public class UncConexionService
     public T EjecutarConAcceso<T>(Func<T> operacion)
     {
         UltimoErrorMensaje = null;
+        var configuracion = ResolverConfiguracion();
 
-        if (string.IsNullOrWhiteSpace(_rutas.RaizUnc))
+        if (string.IsNullOrWhiteSpace(configuracion.RaizUnc))
         {
             UltimoErrorMensaje = "Rutas:RaizUnc no está configurada.";
             return operacion();
@@ -59,23 +59,23 @@ public class UncConexionService
 
         try
         {
-            if (OperatingSystem.IsWindows() && UsaCredenciales)
+            if (OperatingSystem.IsWindows() && configuracion.UsarCredenciales)
             {
-                _logger.LogDebug("UncEjecutarConAcceso | Modo=Impersonacion | RaizUnc={RaizUnc}", _rutas.RaizUnc);
-                return EjecutarConImpersonacion(operacion);
+                _logger.LogDebug("UncEjecutarConAcceso | Modo=Impersonacion | RaizUnc={RaizUnc}", configuracion.RaizUnc);
+                return EjecutarConImpersonacion(operacion, configuracion);
             }
 
             _logger.LogWarning(
                 "UncEjecutarConAcceso | Modo=IdentidadProceso | UsaCredenciales={UsaCredenciales} | RaizUnc={RaizUnc}",
-                UsaCredenciales,
-                _rutas.RaizUnc);
-            EstablecerConexionWNetSiAplica();
+                configuracion.UsarCredenciales,
+                configuracion.RaizUnc);
+            EstablecerConexionWNetSiAplica(configuracion);
             return operacion();
         }
         catch (Exception ex)
         {
             UltimoErrorMensaje = ex.Message;
-            _logger.LogError(ex, "UncOperacionFallo | RaizUnc={RaizUnc}", _rutas.RaizUnc);
+            _logger.LogError(ex, "UncOperacionFallo | RaizUnc={RaizUnc}", configuracion.RaizUnc);
             throw;
         }
     }
@@ -85,8 +85,9 @@ public class UncConexionService
         CancellationToken cancellationToken = default)
     {
         UltimoErrorMensaje = null;
+        var configuracion = await ResolverConfiguracionAsync(cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(_rutas.RaizUnc))
+        if (string.IsNullOrWhiteSpace(configuracion.RaizUnc))
         {
             UltimoErrorMensaje = "Rutas:RaizUnc no está configurada.";
             return await operacion(cancellationToken);
@@ -94,25 +95,26 @@ public class UncConexionService
 
         try
         {
-            if (OperatingSystem.IsWindows() && UsaCredenciales)
+            if (OperatingSystem.IsWindows() && configuracion.UsarCredenciales)
             {
-                _logger.LogDebug("UncEjecutarConAccesoAsync | Modo=Impersonacion | RaizUnc={RaizUnc}", _rutas.RaizUnc);
+                _logger.LogDebug("UncEjecutarConAccesoAsync | Modo=Impersonacion | RaizUnc={RaizUnc}", configuracion.RaizUnc);
                 return await EjecutarConImpersonacionAsync(
                     () => operacion(cancellationToken),
+                    configuracion,
                     cancellationToken);
             }
 
             _logger.LogWarning(
                 "UncEjecutarConAccesoAsync | Modo=IdentidadProceso | UsaCredenciales={UsaCredenciales} | RaizUnc={RaizUnc}",
-                UsaCredenciales,
-                _rutas.RaizUnc);
-            EstablecerConexionWNetSiAplica();
+                configuracion.UsarCredenciales,
+                configuracion.RaizUnc);
+            EstablecerConexionWNetSiAplica(configuracion);
             return await operacion(cancellationToken);
         }
         catch (Exception ex)
         {
             UltimoErrorMensaje = ex.Message;
-            _logger.LogError(ex, "UncOperacionFallo | RaizUnc={RaizUnc}", _rutas.RaizUnc);
+            _logger.LogError(ex, "UncOperacionFallo | RaizUnc={RaizUnc}", configuracion.RaizUnc);
             throw;
         }
     }
@@ -124,28 +126,63 @@ public class UncConexionService
             return true;
         });
 
-    private T EjecutarConImpersonacion<T>(Func<T> operacion)
+    public void InvalidarConexionRed()
     {
-        using var token = AbrirTokenRed();
+        _conexionWNetEstablecida = false;
+        _ultimaRaizUnc = null;
+        _ultimoUsuario = null;
+        _ultimaClave = null;
+    }
+
+    private UncRuntimeConfig ResolverConfiguracion() =>
+        ResolverConfiguracionAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+    private async Task<UncRuntimeConfig> ResolverConfiguracionAsync(CancellationToken cancellationToken)
+    {
+        var raizUnc = (await _config.ObtenerRaizUncAsync(cancellationToken)).Trim();
+        var usuario = (await _config.ObtenerRedUsuarioAsync(cancellationToken)).Trim();
+        var clave = await _config.ObtenerRedClaveAsync(cancellationToken);
+        var usarCredenciales = await _config.UsaCredencialesUncAsync(cancellationToken);
+
+        InvalidarConexionRedSiCambio(raizUnc, usuario, clave);
+
+        return new UncRuntimeConfig(raizUnc, usuario, clave, usarCredenciales);
+    }
+
+    private void InvalidarConexionRedSiCambio(string raizUnc, string usuario, string clave)
+    {
+        if (_ultimaRaizUnc == raizUnc && _ultimoUsuario == usuario && _ultimaClave == clave)
+            return;
+
+        InvalidarConexionRed();
+        _ultimaRaizUnc = raizUnc;
+        _ultimoUsuario = usuario;
+        _ultimaClave = clave;
+    }
+
+    private T EjecutarConImpersonacion<T>(Func<T> operacion, UncRuntimeConfig configuracion)
+    {
+        using var token = AbrirTokenRed(configuracion);
         return WindowsIdentity.RunImpersonated(token, operacion);
     }
 
     private async Task<T> EjecutarConImpersonacionAsync<T>(
         Func<Task<T>> operacion,
+        UncRuntimeConfig configuracion,
         CancellationToken cancellationToken)
     {
-        using var token = AbrirTokenRed();
+        using var token = AbrirTokenRed(configuracion);
         return await WindowsIdentity.RunImpersonatedAsync(token, operacion);
     }
 
-    private SafeAccessTokenHandle AbrirTokenRed()
+    private SafeAccessTokenHandle AbrirTokenRed(UncRuntimeConfig configuracion)
     {
-        var (dominio, usuario) = ResolverDominioYUsuario();
+        var (dominio, usuario) = ResolverDominioYUsuario(configuracion);
 
         if (!LogonUser(
                 usuario,
                 dominio,
-                _red.Clave,
+                configuracion.Clave,
                 Logon32LogonNewCredentials,
                 Logon32ProviderWinnt50,
                 out var tokenHandle))
@@ -164,9 +201,9 @@ public class UncConexionService
         return new SafeAccessTokenHandle(tokenHandle);
     }
 
-    private (string Dominio, string Usuario) ResolverDominioYUsuario()
+    private (string Dominio, string Usuario) ResolverDominioYUsuario(UncRuntimeConfig configuracion)
     {
-        var usuario = _red.Usuario.Trim();
+        var usuario = configuracion.Usuario.Trim();
 
         if (usuario.Contains('\\'))
         {
@@ -174,16 +211,16 @@ public class UncConexionService
             return (partes[0], partes[1]);
         }
 
-        var servidor = _rutas.RaizUnc.TrimStart('\\').Split('\\', StringSplitOptions.RemoveEmptyEntries)[0];
+        var servidor = configuracion.RaizUnc.TrimStart('\\').Split('\\', StringSplitOptions.RemoveEmptyEntries)[0];
         return (servidor, usuario);
     }
 
-    private void EstablecerConexionWNetSiAplica()
+    private void EstablecerConexionWNetSiAplica(UncRuntimeConfig configuracion)
     {
-        if (!OperatingSystem.IsWindows() || !UsaCredenciales || _conexionWNetEstablecida)
+        if (!OperatingSystem.IsWindows() || !configuracion.UsarCredenciales || _conexionWNetEstablecida)
             return;
 
-        var (dominio, usuario) = ResolverDominioYUsuario();
+        var (dominio, usuario) = ResolverDominioYUsuario(configuracion);
         var usuarioCompleto = string.IsNullOrWhiteSpace(dominio) ? usuario : $"{dominio}\\{usuario}";
 
         var resultado = WNetAddConnection2(
@@ -192,9 +229,9 @@ public class UncConexionService
                 Scope = ResourceScope.GlobalNetwork,
                 ResourceType = ResourceType.Disk,
                 DisplayType = ResourceDisplaytype.Share,
-                RemoteName = _rutas.RaizUnc.TrimEnd('\\')
+                RemoteName = configuracion.RaizUnc.TrimEnd('\\')
             },
-            _red.Clave,
+            configuracion.Clave,
             usuarioCompleto,
             0);
 
@@ -256,4 +293,10 @@ public class UncConexionService
         Server = 0x02,
         Share = 0x03
     }
+
+    private sealed record UncRuntimeConfig(
+        string RaizUnc,
+        string Usuario,
+        string Clave,
+        bool UsarCredenciales);
 }

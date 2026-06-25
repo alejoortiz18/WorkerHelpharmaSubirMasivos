@@ -450,6 +450,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DashboardAppService>();
         services.AddSingleton<ReprocesoAppService>();
         services.AddSingleton<TransaccionesAppService>();
+        services.AddSingleton<InformesAppService>();
         return services;
     }
 }

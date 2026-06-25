@@ -1,4 +1,5 @@
 using System.Globalization;
+using GestionArchivosEscaneados.Constants;
 using GestionArchivosEscaneados.Models.Entities;
 using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Data.SqlClient;
@@ -47,14 +48,15 @@ public interface ITrazabilidadConsultaSqlService
         string nombreArchivo,
         CancellationToken cancellationToken = default);
 
-    Task<string?> ObtenerConfiguracionAsync(
-        string clave,
+    Task<IReadOnlyList<ConfiguracionProducto>> ListarConfiguracionesProductoAsync(
         CancellationToken cancellationToken = default);
 
-    Task<bool> GuardarConfiguracionAsync(
-        string clave,
-        string valor,
-        string? descripcion = null,
+    Task<ConfiguracionProducto?> ObtenerConfiguracionProductoAsync(
+        string producto,
+        CancellationToken cancellationToken = default);
+
+    Task GuardarConfiguracionProductoAsync(
+        ConfiguracionProducto configuracion,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<UsuarioEscaneoResumen>> ListarUsuariosConEscaneosAsync(CancellationToken cancellationToken = default);
@@ -67,18 +69,45 @@ public interface ITrazabilidadConsultaSqlService
         string nombreUsuario,
         string fecha,
         CancellationToken cancellationToken = default);
+
+    Task<int> ContarDocumentosEscaneadosAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<FechaEscaneoResumen>> ListarEscaneosPorFechaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UsuarioEscaneoTotal>> ListarEscaneosPorUsuarioAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MesEscaneoResumen>> ListarEscaneosPorMesAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ProbarConexionSqlAsync(
+        string? connectionStringOverride = null,
+        CancellationToken cancellationToken = default);
 }
 
 public class TrazabilidadConsultaSqlService : ITrazabilidadConsultaSqlService
 {
-    private readonly string _connectionString;
+    private readonly string _bootstrapConnectionString;
     private readonly ILogger<TrazabilidadConsultaSqlService> _logger;
 
     public TrazabilidadConsultaSqlService(
         IOptions<TrazabilidadSqlSettings> settings,
         ILogger<TrazabilidadConsultaSqlService> logger)
     {
-        _connectionString = settings.Value.ConnectionString;
+        _bootstrapConnectionString = settings.Value.ConnectionString;
         _logger = logger;
     }
 
@@ -146,20 +175,28 @@ IF COL_LENGTH(N'dbo.DocumentosProcesados', N'IdCartera') IS NULL
 IF COL_LENGTH(N'dbo.DocumentosProcesados', N'FechaFactura') IS NULL
     ALTER TABLE dbo.DocumentosProcesados ADD FechaFactura datetime2(0) NULL;
 
+IF OBJECT_ID(N'dbo.Configuraciones', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Configuraciones', N'Clave') IS NOT NULL
+BEGIN
+    DROP TABLE dbo.Configuraciones;
+END
+
 IF OBJECT_ID(N'dbo.Configuraciones', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.Configuraciones
     (
         ConfiguracionId int IDENTITY(1,1) NOT NULL CONSTRAINT PK_Configuraciones PRIMARY KEY,
-        Clave nvarchar(100) NOT NULL,
-        Valor nvarchar(MAX) NOT NULL,
+        Producto nvarchar(100) NOT NULL,
+        Endpoint nvarchar(MAX) NULL,
+        EndpointVerificacion nvarchar(MAX) NULL,
+        ClaveCredencial nvarchar(MAX) NULL,
+        ValorAdicional nvarchar(MAX) NULL,
+        Prompt nvarchar(MAX) NULL,
         Descripcion nvarchar(500) NULL,
         FechaCreacion datetime2(0) NOT NULL CONSTRAINT DF_Configuraciones_FechaCreacion DEFAULT (sysdatetime()),
         FechaActualizacion datetime2(0) NOT NULL CONSTRAINT DF_Configuraciones_FechaActualizacion DEFAULT (sysdatetime()),
-        CONSTRAINT UQ_Configuraciones_Clave UNIQUE (Clave)
+        CONSTRAINT UQ_Configuraciones_Producto UNIQUE (Producto)
     );
-
-    CREATE INDEX IX_Configuraciones_Clave ON dbo.Configuraciones (Clave);
 END
 
 ;WITH Duplicados AS
@@ -528,59 +565,154 @@ WHERE u.NombreUsuario = @NombreUsuario
         return affected > 0;
     }
 
-    public async Task<string?> ObtenerConfiguracionAsync(
-        string clave,
+    public async Task<IReadOnlyList<ConfiguracionProducto>> ListarConfiguracionesProductoAsync(
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-SELECT TOP (1) Valor
+SELECT
+    ConfiguracionId,
+    Producto,
+    Endpoint,
+    EndpointVerificacion,
+    ClaveCredencial,
+    ValorAdicional,
+    Prompt,
+    Descripcion,
+    FechaCreacion,
+    FechaActualizacion
 FROM dbo.Configuraciones
-WHERE Clave = @Clave;
+ORDER BY Producto;
 """;
 
-        return await EjecutarScalarAsync(
+        return await EjecutarReaderAsync(
             sql,
-            static async command =>
+            async command =>
             {
-                var result = await command.ExecuteScalarAsync();
-                return result != null && result != DBNull.Value ? result.ToString() : null;
+                var lista = new List<ConfiguracionProducto>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    lista.Add(LeerConfiguracionProducto(reader));
+
+                return (IReadOnlyList<ConfiguracionProducto>)lista;
             },
             cancellationToken,
-            command => command.Parameters.AddWithValue("@Clave", clave.Trim()));
+            connectionStringOverride: _bootstrapConnectionString);
     }
 
-    public async Task<bool> GuardarConfiguracionAsync(
-        string clave,
-        string valor,
-        string? descripcion = null,
+    public Task<ConfiguracionProducto?> ObtenerConfiguracionProductoAsync(
+        string producto,
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-IF EXISTS (SELECT 1 FROM dbo.Configuraciones WHERE Clave = @Clave)
+SELECT TOP (1)
+    ConfiguracionId,
+    Producto,
+    Endpoint,
+    EndpointVerificacion,
+    ClaveCredencial,
+    ValorAdicional,
+    Prompt,
+    Descripcion,
+    FechaCreacion,
+    FechaActualizacion
+FROM dbo.Configuraciones
+WHERE Producto = @Producto;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                return await reader.ReadAsync(cancellationToken)
+                    ? LeerConfiguracionProducto(reader)
+                    : null;
+            },
+            cancellationToken,
+            command => command.Parameters.AddWithValue("@Producto", producto.Trim()),
+            connectionStringOverride: _bootstrapConnectionString);
+    }
+
+    public async Task GuardarConfiguracionProductoAsync(
+        ConfiguracionProducto configuracion,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+IF EXISTS (SELECT 1 FROM dbo.Configuraciones WHERE Producto = @Producto)
 BEGIN
     UPDATE dbo.Configuraciones
-    SET Valor = @Valor, Descripcion = @Descripcion, FechaActualizacion = SYSDATETIME()
-    WHERE Clave = @Clave;
+    SET
+        Endpoint = @Endpoint,
+        EndpointVerificacion = @EndpointVerificacion,
+        ClaveCredencial = @ClaveCredencial,
+        ValorAdicional = @ValorAdicional,
+        Prompt = @Prompt,
+        Descripcion = @Descripcion,
+        FechaActualizacion = SYSDATETIME()
+    WHERE Producto = @Producto;
 END
 ELSE
 BEGIN
-    INSERT INTO dbo.Configuraciones (Clave, Valor, Descripcion)
-    VALUES (@Clave, @Valor, @Descripcion);
+    INSERT INTO dbo.Configuraciones
+    (
+        Producto,
+        Endpoint,
+        EndpointVerificacion,
+        ClaveCredencial,
+        ValorAdicional,
+        Prompt,
+        Descripcion
+    )
+    VALUES
+    (
+        @Producto,
+        @Endpoint,
+        @EndpointVerificacion,
+        @ClaveCredencial,
+        @ValorAdicional,
+        @Prompt,
+        @Descripcion
+    );
 END
 """;
 
         await EjecutarNonQueryAsync(
             sql,
             cancellationToken,
-            command =>
-            {
-                command.Parameters.AddWithValue("@Clave", clave.Trim());
-                command.Parameters.AddWithValue("@Valor", valor ?? string.Empty);
-                command.Parameters.Add("@Descripcion", System.Data.SqlDbType.NVarChar, 500).Value =
-                    (object?)descripcion ?? DBNull.Value;
-            });
+            command => AgregarParametrosConfiguracionProducto(command, configuracion),
+            connectionStringOverride: _bootstrapConnectionString);
+    }
 
-        return true;
+    private static ConfiguracionProducto LeerConfiguracionProducto(SqlDataReader reader) =>
+        new()
+        {
+            ConfiguracionId = reader.GetInt32(0),
+            Producto = reader.GetString(1),
+            Endpoint = reader.IsDBNull(2) ? null : reader.GetString(2),
+            EndpointVerificacion = reader.IsDBNull(3) ? null : reader.GetString(3),
+            ClaveCredencial = reader.IsDBNull(4) ? null : reader.GetString(4),
+            ValorAdicional = reader.IsDBNull(5) ? null : reader.GetString(5),
+            Prompt = reader.IsDBNull(6) ? null : reader.GetString(6),
+            Descripcion = reader.IsDBNull(7) ? null : reader.GetString(7),
+            FechaCreacion = reader.GetDateTime(8),
+            FechaActualizacion = reader.GetDateTime(9)
+        };
+
+    private static void AgregarParametrosConfiguracionProducto(SqlCommand command, ConfiguracionProducto configuracion)
+    {
+        command.Parameters.AddWithValue("@Producto", configuracion.Producto.Trim());
+        command.Parameters.Add("@Endpoint", System.Data.SqlDbType.NVarChar, -1).Value =
+            (object?)configuracion.Endpoint ?? DBNull.Value;
+        command.Parameters.Add("@EndpointVerificacion", System.Data.SqlDbType.NVarChar, -1).Value =
+            (object?)configuracion.EndpointVerificacion ?? DBNull.Value;
+        command.Parameters.Add("@ClaveCredencial", System.Data.SqlDbType.NVarChar, -1).Value =
+            (object?)configuracion.ClaveCredencial ?? DBNull.Value;
+        command.Parameters.Add("@ValorAdicional", System.Data.SqlDbType.NVarChar, -1).Value =
+            (object?)configuracion.ValorAdicional ?? DBNull.Value;
+        command.Parameters.Add("@Prompt", System.Data.SqlDbType.NVarChar, -1).Value =
+            (object?)configuracion.Prompt ?? DBNull.Value;
+        command.Parameters.Add("@Descripcion", System.Data.SqlDbType.NVarChar, 500).Value =
+            (object?)configuracion.Descripcion ?? DBNull.Value;
     }
 
     public async Task<IReadOnlyList<UsuarioEscaneoResumen>> ListarUsuariosConEscaneosAsync(
@@ -674,13 +806,208 @@ ORDER BY dp.NombreArchivo;
             });
     }
 
+    public async Task<int> ContarDocumentosEscaneadosAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT COUNT(dp.DocumentoProcesadoId)
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE (@Desde IS NULL OR fp.FechaProcesamiento >= @Desde)
+  AND (@Hasta IS NULL OR fp.FechaProcesamiento <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario);
+""";
+
+        return await EjecutarScalarAsync(
+            sql,
+            async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                await reader.ReadAsync(cancellationToken);
+                return reader.GetInt32(0);
+            },
+            cancellationToken,
+            command => AgregarFiltrosInforme(command, desde, hasta, nombreUsuario));
+    }
+
+    public async Task<IReadOnlyList<FechaEscaneoResumen>> ListarEscaneosPorFechaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    CONVERT(varchar(10), fp.FechaProcesamiento, 23) AS Fecha,
+    COUNT(dp.DocumentoProcesadoId) AS TotalEscaneo
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE (@Desde IS NULL OR fp.FechaProcesamiento >= @Desde)
+  AND (@Hasta IS NULL OR fp.FechaProcesamiento <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+GROUP BY fp.FechaProcesamiento
+ORDER BY fp.FechaProcesamiento DESC;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<FechaEscaneoResumen>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new FechaEscaneoResumen
+                    {
+                        Fecha = reader.GetString(0),
+                        TotalEscaneo = reader.GetInt32(1)
+                    });
+                }
+
+                return (IReadOnlyList<FechaEscaneoResumen>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosInforme(command, desde, hasta, nombreUsuario));
+    }
+
+    public async Task<IReadOnlyList<UsuarioEscaneoTotal>> ListarEscaneosPorUsuarioAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    u.NombreUsuario,
+    COUNT(dp.DocumentoProcesadoId) AS TotalEscaneo
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE (@Desde IS NULL OR fp.FechaProcesamiento >= @Desde)
+  AND (@Hasta IS NULL OR fp.FechaProcesamiento <= @Hasta)
+GROUP BY u.NombreUsuario
+ORDER BY u.NombreUsuario;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<UsuarioEscaneoTotal>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new UsuarioEscaneoTotal
+                    {
+                        NombreUsuario = reader.GetString(0),
+                        TotalEscaneo = reader.GetInt32(1)
+                    });
+                }
+
+                return (IReadOnlyList<UsuarioEscaneoTotal>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosInforme(command, desde, hasta));
+    }
+
+    public async Task<IReadOnlyList<MesEscaneoResumen>> ListarEscaneosPorMesAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    FORMAT(fp.FechaProcesamiento, 'yyyy-MM') AS Mes,
+    COUNT(dp.DocumentoProcesadoId) AS TotalEscaneo
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE (@Desde IS NULL OR fp.FechaProcesamiento >= @Desde)
+  AND (@Hasta IS NULL OR fp.FechaProcesamiento <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+GROUP BY YEAR(fp.FechaProcesamiento), MONTH(fp.FechaProcesamiento), FORMAT(fp.FechaProcesamiento, 'yyyy-MM')
+ORDER BY YEAR(fp.FechaProcesamiento) DESC, MONTH(fp.FechaProcesamiento) DESC;
+""";
+
+        return await EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<MesEscaneoResumen>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new MesEscaneoResumen
+                    {
+                        Mes = reader.GetString(0),
+                        TotalEscaneo = reader.GetInt32(1)
+                    });
+                }
+
+                return (IReadOnlyList<MesEscaneoResumen>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosInforme(command, desde, hasta, nombreUsuario));
+    }
+
+    public async Task<bool> ProbarConexionSqlAsync(
+        string? connectionStringOverride = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var connectionString = string.IsNullOrWhiteSpace(connectionStringOverride)
+                ? await ResolveOperationalConnectionStringAsync(cancellationToken)
+                : connectionStringOverride;
+
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return Convert.ToInt32(result) == 1;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void AgregarFiltrosInforme(
+        SqlCommand command,
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario = null)
+    {
+        command.Parameters.Add("@Desde", System.Data.SqlDbType.Date).Value =
+            desde.HasValue ? desde.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        command.Parameters.Add("@Hasta", System.Data.SqlDbType.Date).Value =
+            hasta.HasValue ? hasta.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+
+        if (nombreUsuario is null)
+            command.Parameters.AddWithValue("@NombreUsuario", DBNull.Value);
+        else
+            command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim());
+    }
+
+    private async Task<string> ResolveOperationalConnectionStringAsync(CancellationToken cancellationToken) =>
+        _bootstrapConnectionString;
+
     private async Task EjecutarNonQueryAsync(
         string sql,
         CancellationToken cancellationToken,
         Action<SqlCommand>? configure = null,
-        string? databaseName = null)
+        string? databaseName = null,
+        string? connectionStringOverride = null)
     {
-        var connectionString = BuildConnectionString(databaseName);
+        var baseConnectionString = connectionStringOverride
+            ?? await ResolveOperationalConnectionStringAsync(cancellationToken);
+        var connectionString = BuildConnectionString(databaseName, baseConnectionString);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -695,9 +1022,12 @@ ORDER BY dp.NombreArchivo;
         Func<SqlCommand, Task<T>> execute,
         CancellationToken cancellationToken,
         Action<SqlCommand>? configure = null,
-        string? databaseName = null)
+        string? databaseName = null,
+        string? connectionStringOverride = null)
     {
-        var connectionString = BuildConnectionString(databaseName);
+        var baseConnectionString = connectionStringOverride
+            ?? await ResolveOperationalConnectionStringAsync(cancellationToken);
+        var connectionString = BuildConnectionString(databaseName, baseConnectionString);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -712,9 +1042,12 @@ ORDER BY dp.NombreArchivo;
         Func<SqlCommand, Task<T>> execute,
         CancellationToken cancellationToken,
         Action<SqlCommand>? configure = null,
-        string? databaseName = null)
+        string? databaseName = null,
+        string? connectionStringOverride = null)
     {
-        var connectionString = BuildConnectionString(databaseName);
+        var baseConnectionString = connectionStringOverride
+            ?? await ResolveOperationalConnectionStringAsync(cancellationToken);
+        var connectionString = BuildConnectionString(databaseName, baseConnectionString);
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -724,11 +1057,11 @@ ORDER BY dp.NombreArchivo;
         return await execute(command);
     }
 
-    private string BuildConnectionString(string? databaseName)
+    private static string BuildConnectionString(string? databaseName, string baseConnectionString)
     {
         return string.IsNullOrWhiteSpace(databaseName)
-            ? _connectionString
-            : new SqlConnectionStringBuilder(_connectionString) { InitialCatalog = databaseName }.ConnectionString;
+            ? baseConnectionString
+            : new SqlConnectionStringBuilder(baseConnectionString) { InitialCatalog = databaseName }.ConnectionString;
     }
 
     private static DateOnly ParseFecha(string fecha) =>

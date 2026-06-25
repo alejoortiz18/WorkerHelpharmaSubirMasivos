@@ -1,7 +1,9 @@
 using Microsoft.Extensions.FileProviders;
 using GestionArchivosEscaneados.Application;
 using GestionArchivosEscaneados.Infrastructure;
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
+using GestionArchivosEscaneados.Infrastructure.Unc;
 using GestionArchivosEscaneados.Models.Settings;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -30,14 +32,19 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var rutas = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RutasSettings>>().Value;
-    var unc = scope.ServiceProvider.GetRequiredService<GestionArchivosEscaneados.Infrastructure.Unc.UncConexionService>();
+    var unc = scope.ServiceProvider.GetRequiredService<UncConexionService>();
     var trazabilidad = scope.ServiceProvider.GetRequiredService<ITrazabilidadConsultaSqlService>();
-    var accesible = unc.AsegurarAccesoUnc();
+    var productos = scope.ServiceProvider.GetRequiredService<IConfiguracionProductoService>();
+    var config = scope.ServiceProvider.GetRequiredService<IIntegracionConfigProvider>();
+
     await trazabilidad.EnsureSchemaAsync();
+    await productos.SembrarDesdeAppSettingsSiFaltanAsync();
+
+    var raizUnc = await config.ObtenerRaizUncAsync();
+    var accesible = unc.AsegurarAccesoUnc();
     logger.LogInformation(
         "StartupPortal | RaizUnc={RaizUnc} | UncAccesible={Accesible} | UsaCredenciales={UsaCredenciales} | Entorno={Entorno}",
-        rutas.RaizUnc,
+        raizUnc,
         accesible,
         unc.UsaCredenciales,
         app.Environment.EnvironmentName);

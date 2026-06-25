@@ -3,6 +3,7 @@ using GestionArchivosEscaneados.Infrastructure.Barcode;
 using GestionArchivosEscaneados.Infrastructure.Auth;
 using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
+using GestionArchivosEscaneados.Infrastructure.Salud;
 using GestionArchivosEscaneados.Infrastructure.Unc;
 using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Extensions.Configuration;
@@ -28,6 +29,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<SoporteFisicoApiService>();
         services.AddHttpClient<OpenAiBarcodeService>();
 
+        services.AddHttpClient(nameof(SaludAppService));
+
         services.AddSingleton<UncConexionService>();
         services.AddSingleton<UncStorageService>();
         services.AddSingleton<ITrazabilidadConsultaSqlService, TrazabilidadConsultaSqlService>();
@@ -35,7 +38,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBarcodeRegionService, BarcodeRegionService>();
         services.AddSingleton<IOpenAiBarcodeService>(sp => sp.GetRequiredService<OpenAiBarcodeService>());
         services.AddSingleton<ISoporteProcesamientoService, SoporteProcesamientoService>();
-        services.AddSingleton<IConfiguracionesService, ConfiguracionesService>();
+        services.AddSingleton<IConfiguracionProductoService, ConfiguracionProductoService>();
+        services.AddSingleton<IIntegracionConfigProvider, IntegracionConfigProvider>();
+        services.AddSingleton<SaludAppService>();
 
         return services;
     }

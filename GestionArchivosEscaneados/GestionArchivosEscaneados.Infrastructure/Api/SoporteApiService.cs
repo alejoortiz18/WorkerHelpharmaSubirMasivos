@@ -1,27 +1,26 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Models.Dto;
-using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace GestionArchivosEscaneados.Infrastructure.Api;
 
 public class SoporteApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly IIntegracionConfigProvider _config;
     private readonly ILogger<SoporteApiService> _logger;
-    private readonly string _apiKey;
 
     public SoporteApiService(
         HttpClient httpClient,
-        ILogger<SoporteApiService> logger,
-        IOptions<ApiCredentialsSettings> credenciales)
+        IIntegracionConfigProvider config,
+        ILogger<SoporteApiService> logger)
     {
         _httpClient = httpClient;
+        _config = config;
         _logger = logger;
-        _apiKey = credenciales.Value.SoporteApiKey;
     }
 
     public async Task<SoporteResponseDto?> EnviarSoporteAsync(string soporte)
@@ -30,11 +29,11 @@ public class SoporteApiService
         {
             var soporteConsulta = soporte.Trim();
             var json = JsonSerializer.Serialize(new { soporte = soporteConsulta });
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                "https://api-soportes.helpharma.com.co/api/DocSoporte/soportes/DatosSoportes");
+            var endpoint = await _config.ObtenerSoporteApiUrlAsync();
+            var apiKey = await _config.ObtenerSoporteApiKeyAsync();
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
 
-            request.Headers.Add("X-API-KEY", _apiKey);
+            request.Headers.Add("X-API-KEY", apiKey);
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(request);

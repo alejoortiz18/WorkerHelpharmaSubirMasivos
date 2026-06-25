@@ -1,0 +1,142 @@
+@using GestionArchivosEscaneados.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = EtiquetasUi.Salud;
+}
+@model GestionArchivosEscaneados.Infrastructure.Salud.SaludPanel
+
+<div class="page-header mb-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+        <h1 class="h3 mb-1">@EtiquetasUi.Salud</h1>
+        <p class="text-muted mb-0">Una fila por producto en <code>dbo.Configuraciones</code>. Credenciales enmascaradas en pantalla; en BD texto plano.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <form asp-action="Verificar" method="post" class="m-0">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-primary">@EtiquetasUi.VerificarConexiones</button>
+        </form>
+        @if (Model.RequiereReinicio)
+        {
+            <form asp-action="AplicarCambios" method="post" class="m-0"
+                  onsubmit="return confirm('@EtiquetasUi.ConfirmarReinicio');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-warning">@EtiquetasUi.AplicarCambios</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (TempData["SaludMensaje"] is string mensaje)
+{
+    <div class="alert alert-success">@mensaje</div>
+}
+
+@if (Model.RequiereReinicio)
+{
+    <div class="alert alert-warning mb-4">@EtiquetasUi.CambiosPendientesReinicio</div>
+}
+
+@foreach (var item in Model.Integraciones)
+{
+    <div class="card shadow-sm border-0 mb-4 salud-card">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <strong>@item.Producto</strong>
+                <span class="badge @(item.GuardadoEnBd ? "text-bg-success" : "text-bg-secondary")">
+                    @(item.GuardadoEnBd ? EtiquetasUi.GuardadoEnBd : EtiquetasUi.PendienteEnBd)
+                </span>
+            </div>
+            <span class="salud-estado @(item.Activo ? "salud-estado-activo" : "salud-estado-inactivo")">
+                @(item.Activo ? EtiquetasUi.EstadoActivo : EtiquetasUi.EstadoInactivo)
+            </span>
+        </div>
+        <div class="card-body">
+            @if (!item.Activo && !string.IsNullOrWhiteSpace(item.Error))
+            {
+                <div class="alert alert-danger py-2">@item.Error</div>
+            }
+            else if (item.Activo && !string.IsNullOrWhiteSpace(item.Error))
+            {
+                <div class="alert alert-warning py-2">@item.Error</div>
+            }
+
+            <form asp-action="Guardar" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@item.Id" />
+
+                <div class="col-12">
+                    <label class="form-label">@EtiquetasUi.Endpoint</label>
+                    <input type="text" name="endpoint" class="form-control font-monospace" value="@item.Endpoint" />
+                </div>
+
+                @if (item.UsaEndpointVerificacion)
+                {
+                    <div class="col-12">
+                        <label class="form-label">@EtiquetasUi.EndpointVerificacion</label>
+                        <input type="text" name="endpointVerificacion" class="form-control font-monospace"
+                               value="@item.EndpointVerificacion" />
+                    </div>
+                }
+
+                <div class="col-12">
+                    <label class="form-label">
+                        @(item.Id == "unc" ? "Usuario de red" : EtiquetasUi.ClaveApi)
+                    </label>
+                    @if (item.OcultarClaveCredencial && item.TieneClaveCredencial)
+                    {
+                        <div class="salud-secreto-actual small text-muted mb-1">
+                            @EtiquetasUi.CredencialActual: <span class="font-monospace">@item.ClaveCredencialEnmascarada</span>
+                        </div>
+                    }
+                    @if (item.OcultarClaveCredencial)
+                    {
+                        <input type="password" name="claveCredencial" class="form-control font-monospace"
+                               placeholder="@EtiquetasUi.MantenerCredencialActual" autocomplete="new-password" />
+                    }
+                    else
+                    {
+                        <input type="text" name="claveCredencial" class="form-control font-monospace"
+                               value="@item.ClaveCredencial" />
+                    }
+                </div>
+
+                @if (item.Id != "soporte-api")
+                {
+                    <div class="col-12">
+                        <label class="form-label">@EtiquetasUi.ClaveSecundaria</label>
+                        @if (item.OcultarValorAdicional && item.TieneValorAdicional)
+                        {
+                            <div class="salud-secreto-actual small text-muted mb-1">
+                                @EtiquetasUi.CredencialActual: <span class="font-monospace">@item.ValorAdicionalEnmascarado</span>
+                            </div>
+                            <input type="password" name="valorAdicional" class="form-control font-monospace"
+                                   placeholder="@EtiquetasUi.MantenerCredencialActual" autocomplete="new-password" />
+                        }
+                        else
+                        {
+                            <input type="text" name="valorAdicional" class="form-control font-monospace"
+                                   value="@item.ValorAdicional" />
+                        }
+                    </div>
+                }
+
+                @if (item.UsaPrompt)
+                {
+                    <div class="col-12">
+                        <label class="form-label">@EtiquetasUi.PromptOpenAi</label>
+                        <textarea name="prompt" class="form-control font-monospace" rows="6">@item.Prompt</textarea>
+                    </div>
+                }
+
+                <div class="col-12">
+                    <label class="form-label">@EtiquetasUi.DescripcionConfiguracion</label>
+                    <input type="text" name="descripcion" class="form-control" value="@item.Descripcion" />
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-outline-primary btn-sm">@EtiquetasUi.GuardarConfiguracion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

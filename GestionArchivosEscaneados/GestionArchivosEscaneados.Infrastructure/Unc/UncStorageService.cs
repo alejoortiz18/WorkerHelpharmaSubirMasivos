@@ -1,6 +1,6 @@
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Models.Entities;
 using GestionArchivosEscaneados.Models.Settings;
-using Microsoft.Extensions.Options;
 
 namespace GestionArchivosEscaneados.Infrastructure.Unc;
 
@@ -32,17 +32,20 @@ public static class RutasDiaHelper
 
 public class UncStorageService
 {
-    private readonly RutasSettings _rutas;
+    private readonly IIntegracionConfigProvider _config;
     private readonly UncConexionService _uncConexion;
 
-    public UncStorageService(IOptions<RutasSettings> rutas, UncConexionService uncConexion)
+    public UncStorageService(IIntegracionConfigProvider config, UncConexionService uncConexion)
     {
-        _rutas = rutas.Value;
+        _config = config;
         _uncConexion = uncConexion;
     }
 
-    public RutasDiaContext ObtenerRutasDia(string usuario, string fecha) =>
-        RutasDiaHelper.Resolver(_rutas, usuario, fecha);
+    public RutasDiaContext ObtenerRutasDia(string usuario, string fecha)
+    {
+        var raizUnc = _config.ObtenerRaizUncAsync(CancellationToken.None).GetAwaiter().GetResult();
+        return RutasDiaHelper.Resolver(new RutasSettings { RaizUnc = raizUnc }, usuario, fecha);
+    }
 
     public Task<T> EjecutarConAccesoAsync<T>(
         Func<CancellationToken, Task<T>> operacion,

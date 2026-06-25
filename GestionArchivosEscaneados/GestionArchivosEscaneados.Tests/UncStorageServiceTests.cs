@@ -67,12 +67,10 @@ public class UncStorageServiceTests
             RaizUnc = root
         };
 
-        var unc = new UncConexionService(
-            Options.Create(rutas),
-            Options.Create(new RedSettings()),
-            NullLogger<UncConexionService>.Instance);
+        var config = new MapIntegracionConfigProvider(rutas);
+        var unc = new UncConexionService(config, NullLogger<UncConexionService>.Instance);
 
-        return (new UncStorageService(Options.Create(rutas), unc), root);
+        return (new UncStorageService(config, unc), root);
     }
 
     private static string CrearPdfNoProcesado(string root, string usuario, string fecha, string nombreArchivo)

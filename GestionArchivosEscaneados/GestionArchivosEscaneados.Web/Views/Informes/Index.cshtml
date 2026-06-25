@@ -1,0 +1,180 @@
+@using GestionArchivosEscaneados.Constants
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = EtiquetasUi.Informes;
+    var inicialUsuario = string.IsNullOrWhiteSpace(Model.UsuarioDetalle)
+        ? "?"
+        : Model.UsuarioDetalle.Trim()[0].ToString().ToUpperInvariant();
+    var filtroDesde = Model.Desde?.ToString("yyyy-MM-dd");
+    var filtroHasta = Model.Hasta?.ToString("yyyy-MM-dd");
+    var hayFiltro = Model.Desde.HasValue || Model.Hasta.HasValue || !string.IsNullOrWhiteSpace(Model.UsuarioDetalle);
+}
+@model GestionArchivosEscaneados.Application.InformesDatos
+
+<div class="informes-page">
+    <div class="page-header mb-4">
+        <h1 class="h3 mb-1">@EtiquetasUi.Informes</h1>
+        <p class="text-muted mb-0">@EtiquetasUi.InformesDescripcion</p>
+    </div>
+
+    <div class="informes-kpi-grid">
+        <div class="informes-kpi informes-kpi-primary">
+            <div class="informes-kpi-label">@EtiquetasUi.DocumentosEnPeriodo</div>
+            <div class="informes-kpi-value">@Model.TotalHistorico.ToString("N0")</div>
+            <div class="informes-kpi-hint">@(hayFiltro ? EtiquetasUi.FiltroActivo : EtiquetasUi.TodoElHistorico)</div>
+        </div>
+        <div class="informes-kpi">
+            <div class="informes-kpi-label">@EtiquetasUi.UsuariosEnPeriodo</div>
+            <div class="informes-kpi-value">@Model.PorUsuario.Count.ToString("N0")</div>
+            <div class="informes-kpi-hint">@EtiquetasUi.TotalPorUsuario</div>
+        </div>
+        <div class="informes-kpi">
+            <div class="informes-kpi-label">@EtiquetasUi.DiasConEscaneo</div>
+            <div class="informes-kpi-value">@Model.PorFecha.Count.ToString("N0")</div>
+            <div class="informes-kpi-hint">@EtiquetasUi.TotalPorFecha</div>
+        </div>
+    </div>
+
+    <div class="informes-filter-card shadow-sm">
+        <div class="informes-filter-head">
+            <h2 class="informes-filter-title">@EtiquetasUi.FiltrarInformes</h2>
+            <div class="informes-filter-badges">
+                @if (Model.Desde.HasValue || Model.Hasta.HasValue)
+                {
+                    <span class="informes-badge">
+                        @EtiquetasUi.Desde @(Model.Desde?.ToString("dd/MM/yyyy") ?? "…")
+                        — @EtiquetasUi.Hasta @(Model.Hasta?.ToString("dd/MM/yyyy") ?? "…")
+                    </span>
+                }
+                else
+                {
+                    <span class="informes-badge informes-badge-muted">@EtiquetasUi.TodoElHistorico</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.UsuarioDetalle))
+                {
+                    <span class="informes-badge">@EtiquetasUi.Usuario: @Model.UsuarioDetalle</span>
+                }
+            </div>
+        </div>
+        <div class="informes-filter-body">
+            <form method="get" asp-action="Index" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Desde</label>
+                    <input type="date" name="desde" class="form-control" value="@filtroDesde" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Hasta</label>
+                    <input type="date" name="hasta" class="form-control" value="@filtroHasta" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.DetalleUsuario</label>
+                    <select name="usuario" class="form-select">
+                        <option value="">@EtiquetasUi.SeleccionarUsuario…</option>
+                        @foreach (var u in Model.UsuariosDisponibles)
+                        {
+                            if (Model.UsuarioDetalle == u)
+                            {
+                                <option value="@u" selected="selected">@u</option>
+                            }
+                            else
+                            {
+                                <option value="@u">@u</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">@EtiquetasUi.AplicarFiltro</button>
+                    @if (hayFiltro)
+                    {
+                        <a asp-action="Index" class="btn btn-link btn-sm text-decoration-none px-0">@EtiquetasUi.LimpiarFiltros</a>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <ul class="nav informes-tabs" id="informesTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-resumen" data-bs-toggle="tab" data-bs-target="#pane-resumen"
+                    type="button" role="tab">@EtiquetasUi.ResumenGeneral</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-usuarios" data-bs-toggle="tab" data-bs-target="#pane-usuarios"
+                    type="button" role="tab">@EtiquetasUi.TotalPorUsuario</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-tiempo" data-bs-toggle="tab" data-bs-target="#pane-tiempo"
+                    type="button" role="tab">@EtiquetasUi.PorTiempo</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-detalle" data-bs-toggle="tab" data-bs-target="#pane-detalle"
+                    type="button" role="tab">@EtiquetasUi.DetalleUsuario</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="informesTabContent">
+        <div class="tab-pane fade show active" id="pane-resumen" role="tabpanel">
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    @await Html.PartialAsync("_InformeTablaUsuario", (Model.PorUsuario, Model.TotalHistorico))
+                </div>
+                <div class="col-lg-6">
+                    @await Html.PartialAsync("_InformeTablaFecha", (EtiquetasUi.TotalPorFecha, Model.PorFecha))
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-usuarios" role="tabpanel">
+            @await Html.PartialAsync("_InformeTablaUsuario", (Model.PorUsuario, Model.TotalHistorico))
+        </div>
+
+        <div class="tab-pane fade" id="pane-tiempo" role="tabpanel">
+            @await Html.PartialAsync("_InformeTablaMes", (EtiquetasUi.TotalPorMes, Model.PorMes))
+            @await Html.PartialAsync("_InformeTablaFecha", (EtiquetasUi.TotalPorDia, Model.PorDia))
+        </div>
+
+        <div class="tab-pane fade" id="pane-detalle" role="tabpanel">
+            @if (string.IsNullOrWhiteSpace(Model.UsuarioDetalle))
+            {
+                <div class="informes-hint-card">
+                    <p>@EtiquetasUi.SeleccioneUsuarioHint</p>
+                </div>
+            }
+            else
+            {
+                <div class="informes-user-hero">
+                    <div class="informes-user-avatar" aria-hidden="true">@inicialUsuario</div>
+                    <div class="informes-user-meta">
+                        <h3>@Model.UsuarioDetalle</h3>
+                        <p>@EtiquetasUi.DetalleUsuario</p>
+                    </div>
+                    <div class="informes-user-total">
+                        <div class="informes-user-total-value">@((Model.UsuarioTotal ?? 0).ToString("N0"))</div>
+                        <div class="informes-user-total-label">@EtiquetasUi.TotalEscaneo</div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        @await Html.PartialAsync("_InformeTablaMes", ($"{EtiquetasUi.Mes} — {Model.UsuarioDetalle}", Model.UsuarioPorMes))
+                    </div>
+                    <div class="col-lg-6">
+                        @await Html.PartialAsync("_InformeTablaFecha", ($"{EtiquetasUi.Fecha} — {Model.UsuarioDetalle}", Model.UsuarioPorDia))
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.UsuarioDetalle))
+{
+    @section Scripts {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var tab = document.querySelector('#tab-detalle');
+                if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+            });
+        </script>
+    }
+}

@@ -1,0 +1,37 @@
+@using GestionArchivosEscaneados.Constants
+@model (string Titulo, IReadOnlyList<GestionArchivosEscaneados.Models.Entities.FechaEscaneoResumen> Filas)
+
+<section class="informes-panel shadow-sm">
+    <div class="informes-panel-head">
+        <h2 class="informes-panel-title">@Model.Titulo</h2>
+        <span class="informes-panel-count">@Model.Filas.Count @EtiquetasUi.Registros</span>
+    </div>
+    @if (Model.Filas.Count == 0)
+    {
+        <div class="informes-empty">
+            <div class="informes-empty-title">@EtiquetasUi.SinDatosInforme</div>
+        </div>
+    }
+    else
+    {
+        <div class="informes-table-wrap">
+            <table class="informes-table">
+                <thead>
+                    <tr>
+                        <th>@EtiquetasUi.Fecha</th>
+                        <th class="text-end">@EtiquetasUi.TotalEscaneo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Filas)
+                    {
+                        <tr>
+                            <td>@item.Fecha</td>
+                            <td class="informes-count-cell">@item.TotalEscaneo.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

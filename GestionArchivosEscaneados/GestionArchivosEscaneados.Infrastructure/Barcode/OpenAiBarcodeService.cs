@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using GestionArchivosEscaneados.Constants;
 using GestionArchivosEscaneados.Infrastructure.Configuracion;
+using GestionArchivosEscaneados.Models.Entities;
 using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -20,20 +22,23 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
     private readonly HttpClient _httpClient;
     private readonly OpenAiSettings _settings;
+    private readonly IIntegracionConfigProvider _integracionConfig;
+    private readonly IConfiguracionProductoService _productos;
     private readonly ILogger<OpenAiBarcodeService> _logger;
-    private readonly IConfiguracionesService _configuraciones;
     private string? _prompt;
     private bool _promptCargado;
 
     public OpenAiBarcodeService(
         HttpClient httpClient,
         IOptions<OpenAiSettings> settings,
-        IConfiguracionesService configuraciones,
+        IIntegracionConfigProvider integracionConfig,
+        IConfiguracionProductoService productos,
         ILogger<OpenAiBarcodeService> logger)
     {
         _httpClient = httpClient;
         _settings = settings.Value;
-        _configuraciones = configuraciones;
+        _integracionConfig = integracionConfig;
+        _productos = productos;
         _logger = logger;
     }
 
@@ -41,7 +46,8 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
         string rutaPdf,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+        var apiKey = await _integracionConfig.ObtenerOpenAiApiKeyAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(apiKey))
         {
             return new OpenAiBarcodeResult
             {
@@ -49,6 +55,10 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
                 ErrorMensaje = "ApiKey de OpenAI no configurada."
             };
         }
+
+        var model = await _integracionConfig.ObtenerOpenAiModelAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(model))
+            model = _settings.Model;
 
         var prompt = await CargarPromptAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(prompt))
@@ -93,7 +103,7 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
 
             try
             {
-                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, prompt, cancellationToken);
+                var respuestaTexto = await EnviarSolicitudAsync(pdfBytes, prompt, apiKey, model, cancellationToken);
                 var resultado = InterpretarRespuesta(respuestaTexto);
                 resultado.RespuestaCruda = respuestaTexto?.Trim();
 
@@ -105,7 +115,7 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
                 _logger.LogInformation(
                     "OpenAiResultado | Archivo={Archivo} | Modelo={Modelo} | Tipo={Tipo} | Codigo={Codigo}",
                     nombreArchivo,
-                    _settings.Model,
+                    model,
                     resultado.Tipo,
                     resultado.Codigo ?? "-");
 
@@ -171,15 +181,19 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
     private async Task<string?> EnviarSolicitudAsync(
         byte[] pdfBytes,
         string prompt,
+        string apiKey,
+        string model,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
+        var endpoint = await _integracionConfig.ObtenerOpenAiApiUrlAsync(cancellationToken);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         var pdfBase64 = Convert.ToBase64String(pdfBytes);
         var body = new
         {
-            model = _settings.Model,
+            model,
             temperature = 0,
             max_tokens = 32,
             messages = new object[]
@@ -219,12 +233,21 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
         return parsed?.Choices?.FirstOrDefault()?.Message?.Content;
     }
 
-    private Task<string> CargarPromptAsync(CancellationToken cancellationToken)
+    private async Task<string> CargarPromptAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         if (_promptCargado && _prompt != null)
-            return Task.FromResult(_prompt);
+            return _prompt;
+
+        var promptBd = await _integracionConfig.ObtenerOpenAiPromptAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(promptBd))
+        {
+            _prompt = promptBd;
+            _promptCargado = true;
+            _logger.LogInformation("OpenAiPromptCargadoDeBD | Caracteres={Caracteres}", _prompt.Length);
+            return _prompt;
+        }
 
         var promptDeArchivo = CargarPromptDeArchivo(_settings.PromptResourcePath);
         _prompt = promptDeArchivo;
@@ -235,27 +258,24 @@ public class OpenAiBarcodeService : IOpenAiBarcodeService
             _prompt.Length,
             _prompt.Split('\n')[0].Trim());
 
-        SincronizarPromptEnBd(_prompt);
-        return Task.FromResult(_prompt);
+        await SincronizarPromptEnBdAsync(promptDeArchivo, cancellationToken);
+        return _prompt;
     }
 
-    private void SincronizarPromptEnBd(string promptDeArchivo)
+    private async Task SincronizarPromptEnBdAsync(string prompt, CancellationToken cancellationToken)
     {
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await _configuraciones.GuardarAsync(
-                    "OpenAi:PromptBarcode",
-                    promptDeArchivo,
-                    "Prompt para detección de códigos de barras en OpenAI",
-                    CancellationToken.None);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "NoSeGuardoPromptEnBD");
-            }
-        }, CancellationToken.None);
+            var actual = await _productos.ObtenerAsync(ProductoIntegracion.OpenAi, cancellationToken)
+                ?? new ConfiguracionProducto { Producto = ProductoIntegracion.OpenAi };
+
+            actual.Prompt = prompt;
+            await _productos.GuardarAsync(actual, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "NoSeGuardoPromptEnBD");
+        }
     }
 
     private static string CargarPromptDeArchivo(string promptResourcePath)

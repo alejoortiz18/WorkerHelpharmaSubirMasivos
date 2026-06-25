@@ -1,29 +1,26 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Models.Dto;
-using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace GestionArchivosEscaneados.Infrastructure.Api;
 
 public class SoporteFisicoApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly IIntegracionConfigProvider _config;
     private readonly ILogger<SoporteFisicoApiService> _logger;
-    private readonly string _token;
-    private readonly string _idUsuario;
 
     public SoporteFisicoApiService(
         HttpClient httpClient,
-        ILogger<SoporteFisicoApiService> logger,
-        IOptions<ApiCredentialsSettings> credenciales)
+        IIntegracionConfigProvider config,
+        ILogger<SoporteFisicoApiService> logger)
     {
         _httpClient = httpClient;
+        _config = config;
         _logger = logger;
-        _token = credenciales.Value.SoporteFisicoToken;
-        _idUsuario = credenciales.Value.IdUsuario;
     }
 
     public async Task<bool> EnviarSoporteFisicoAsync(
@@ -35,6 +32,11 @@ public class SoporteFisicoApiService
     {
         try
         {
+            var endpoint = await _config.ObtenerSoporteFisicoApiUrlAsync();
+            var token = await _config.ObtenerSoporteFisicoTokenAsync();
+            var idUsuarioConfig = await _config.ObtenerIdUsuarioSoporteFisicoAsync();
+            var idUsuarioEnvio = string.IsNullOrWhiteSpace(idUsuarioConfig) ? idUsuario : idUsuarioConfig;
+
             var soporteNormalizado = NormalizarSoporte(soporte);
             using var form = new MultipartFormDataContent();
             form.Add(new StringContent(soporteNormalizado), "soporte");
@@ -58,7 +60,6 @@ public class SoporteFisicoApiService
             form.Add(new StringContent(""), "reclamante");
             form.Add(new StringContent(""), "idReclamante");
             form.Add(new StringContent(data.ValorCM ?? "0"), "valorCM");
-            var idUsuarioEnvio = string.IsNullOrWhiteSpace(_idUsuario) ? idUsuario : _idUsuario;
             form.Add(new StringContent(idUsuarioEnvio), "idUsuario");
 
             var medicamentosJson = JsonSerializer.Serialize(data.medicamentos ?? []);
@@ -68,11 +69,9 @@ public class SoporteFisicoApiService
             fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
             form.Add(fileContent, "anexo", nombreArchivo);
 
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                "https://intranet.helpharma.com/api/v1/soporte/fisico");
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
 
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             request.Content = form;
 

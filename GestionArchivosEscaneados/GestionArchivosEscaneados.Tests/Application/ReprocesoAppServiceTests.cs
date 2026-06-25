@@ -3,8 +3,10 @@ using System.Text;
 using System.Text.Json;
 using FluentAssertions;
 using GestionArchivosEscaneados.Application;
+using GestionArchivosEscaneados.Constants;
 using GestionArchivosEscaneados.Infrastructure.Api;
 using GestionArchivosEscaneados.Infrastructure.Barcode;
+using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Infrastructure.Trazabilidad;
 using GestionArchivosEscaneados.Infrastructure.Unc;
 using GestionArchivosEscaneados.Models.Entities;
@@ -158,11 +160,9 @@ public class ReprocesoAppServiceTests
         Directory.CreateDirectory(root);
 
         var rutas = new RutasSettings { RaizUnc = root };
-        var uncConexion = new UncConexionService(
-            Options.Create(rutas),
-            Options.Create(new RedSettings()),
-            NullLogger<UncConexionService>.Instance);
-        var unc = new UncStorageService(Options.Create(rutas), uncConexion);
+        var uncConfig = new MapIntegracionConfigProvider(rutas);
+        var uncConexion = new UncConexionService(uncConfig, NullLogger<UncConexionService>.Instance);
+        var unc = new UncStorageService(uncConfig, uncConexion);
         var trazabilidad = Substitute.For<ITrazabilidadConsultaSqlService>();
         trazabilidad.MarcarDocumentoProcesadoAsync(
                 Arg.Any<string>(),
@@ -199,25 +199,33 @@ public class ReprocesoAppServiceTests
             });
 
         var handler = new CapturingHandler();
+        var config = Substitute.For<IIntegracionConfigProvider>();
+        config.ObtenerFallback(Arg.Any<string>()).Returns(string.Empty);
+        config.ObtenerProductoAsync(ProductoIntegracion.SoporteApi, Arg.Any<CancellationToken>())
+            .Returns(new ConfiguracionProducto
+            {
+                Producto = ProductoIntegracion.SoporteApi,
+                Endpoint = IntegracionDefaults.SoporteApiUrl,
+                ClaveCredencial = "test-api-key"
+            });
+        config.ObtenerProductoAsync(ProductoIntegracion.SoporteFisico, Arg.Any<CancellationToken>())
+            .Returns(new ConfiguracionProducto
+            {
+                Producto = ProductoIntegracion.SoporteFisico,
+                Endpoint = IntegracionDefaults.SoporteFisicoApiUrl,
+                ClaveCredencial = "test-token",
+                ValorAdicional = "system"
+            });
+
         var soporteApi = new SoporteApiService(
             new HttpClient(handler),
-            NullLogger<SoporteApiService>.Instance,
-            Options.Create(new ApiCredentialsSettings
-            {
-                SoporteApiKey = "test-api-key",
-                SoporteFisicoToken = "test-token",
-                IdUsuario = "system"
-            }));
+            config,
+            NullLogger<SoporteApiService>.Instance);
 
         var soporteFisicoApi = new SoporteFisicoApiService(
             new HttpClient(handler),
-            NullLogger<SoporteFisicoApiService>.Instance,
-            Options.Create(new ApiCredentialsSettings
-            {
-                SoporteApiKey = "test-api-key",
-                SoporteFisicoToken = "test-token",
-                IdUsuario = "system"
-            }));
+            config,
+            NullLogger<SoporteFisicoApiService>.Instance);
 
         var soporte = new SoporteProcesamientoService(
             soporteApi,
