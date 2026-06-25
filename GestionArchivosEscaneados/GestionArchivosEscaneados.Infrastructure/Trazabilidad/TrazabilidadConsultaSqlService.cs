@@ -57,7 +57,7 @@ public interface ITrazabilidadConsultaSqlService
         string? descripcion = null,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<string>> ListarUsuariosConEscaneosAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UsuarioEscaneoResumen>> ListarUsuariosConEscaneosAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasConTotalEscaneoAsync(
         string nombreUsuario,
@@ -583,13 +583,16 @@ END
         return true;
     }
 
-    public async Task<IReadOnlyList<string>> ListarUsuariosConEscaneosAsync(
+    public async Task<IReadOnlyList<UsuarioEscaneoResumen>> ListarUsuariosConEscaneosAsync(
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-SELECT DISTINCT u.NombreUsuario
+SELECT
+    u.NombreUsuario,
+    COUNT(fp.FechaProcesamientoId) AS CantidadDiasEscaneados
 FROM dbo.Usuarios u
 INNER JOIN dbo.FechasProcesamiento fp ON fp.UsuarioId = u.UsuarioId
+GROUP BY u.NombreUsuario
 ORDER BY u.NombreUsuario;
 """;
 
@@ -597,12 +600,18 @@ ORDER BY u.NombreUsuario;
             sql,
             async command =>
             {
-                var usuarios = new List<string>();
+                var usuarios = new List<UsuarioEscaneoResumen>();
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
                 while (await reader.ReadAsync(cancellationToken))
-                    usuarios.Add(reader.GetString(0));
+                {
+                    usuarios.Add(new UsuarioEscaneoResumen
+                    {
+                        NombreUsuario = reader.GetString(0),
+                        CantidadDiasEscaneados = reader.GetInt32(1)
+                    });
+                }
 
-                return (IReadOnlyList<string>)usuarios;
+                return (IReadOnlyList<UsuarioEscaneoResumen>)usuarios;
             },
             cancellationToken);
     }

@@ -421,7 +421,7 @@ public class TransaccionesAppService
         _trazabilidad = trazabilidad;
     }
 
-    public Task<IReadOnlyList<string>> ListarUsuariosAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<UsuarioEscaneoResumen>> ListarUsuariosAsync(CancellationToken cancellationToken = default) =>
         _trazabilidad.ListarUsuariosConEscaneosAsync(cancellationToken);
 
     public Task<IReadOnlyList<FechaEscaneoResumen>> ListarFechasAsync(

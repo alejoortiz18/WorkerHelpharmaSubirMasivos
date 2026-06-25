@@ -98,7 +98,7 @@ public class ReprocesoResultViewModel
 
 public class TransaccionesUsuariosViewModel
 {
-    public IReadOnlyList<string> Usuarios { get; set; } = [];
+    public IReadOnlyList<UsuarioEscaneoResumen> Usuarios { get; set; } = [];
 }
 
 public class TransaccionesFechasViewModel

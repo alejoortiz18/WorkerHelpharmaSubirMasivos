@@ -16,15 +16,26 @@
 else
 {
     <div class="card shadow-sm border-0">
-        <div class="list-group list-group-flush">
-            @foreach (var usuario in Model.Usuarios)
-            {
-                <a asp-action="Fechas" asp-route-usuario="@usuario"
-                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <span>@usuario</span>
-                    <span class="text-muted">&rarr;</span>
-                </a>
-            }
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle tx-fechas-table w-auto">
+                <thead class="table-light">
+                    <tr>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.Usuario</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.DiasEscaneados</th>
+                        <th class="tx-fechas-action-col"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Usuarios)
+                    {
+                        <tr role="button" onclick="window.location='@Url.Action("Fechas", new { usuario = item.NombreUsuario })'">
+                            <td>@item.NombreUsuario</td>
+                            <td>@item.CantidadDiasEscaneados</td>
+                            <td class="text-muted tx-fechas-action-col">&rarr;</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 }
