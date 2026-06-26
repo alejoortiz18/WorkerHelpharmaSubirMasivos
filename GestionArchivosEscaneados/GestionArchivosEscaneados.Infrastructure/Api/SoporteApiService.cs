@@ -42,9 +42,12 @@ public class SoporteApiService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError(
-                    "ApiSoporteError | Soporte={Soporte} | Status={Status}",
+                    "ApiSoporteError | Soporte={Soporte} | Endpoint={Endpoint} | Body={Body} | Status={Status} | Respuesta={Respuesta}",
                     soporteConsulta,
-                    response.StatusCode);
+                    endpoint,
+                    json,
+                    response.StatusCode,
+                    contenido);
                 return null;
             }
 

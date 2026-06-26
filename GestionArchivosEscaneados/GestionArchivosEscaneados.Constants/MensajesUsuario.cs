@@ -11,6 +11,9 @@ public static class MensajesUsuario
     public const string DocumentoNoEncontrado =
         "No se encontro informacion del documento.\nContacta con el administrador.";
 
+    public const string ErrorConsultaDatosSoportes =
+        "No se encontro informacion del soporte en DatosSoportes.\nVerifique el codigo de barras o contacte al administrador.";
+
     public const string ErrorEnvioSoporteFisico =
         "Se encontro informacion del documento, pero fallo el envio al sistema de soporte fisico.\nContacta con el administrador.";
 

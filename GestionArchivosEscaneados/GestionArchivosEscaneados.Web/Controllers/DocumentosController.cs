@@ -165,6 +165,7 @@ public class DocumentosController : Controller
         {
             return estados[0] switch
             {
+                SoporteProcesamientoEstado.FalloApiDatos => MensajesUsuario.ErrorConsultaDatosSoportes,
                 SoporteProcesamientoEstado.FalloApiFisico => MensajesUsuario.ErrorEnvioSoporteFisico,
                 SoporteProcesamientoEstado.FalloBarcode => MensajesUsuario.ErrorLecturaBarcode,
                 SoporteProcesamientoEstado.FalloOpenAi => MensajesUsuario.ErrorOpenAi,
