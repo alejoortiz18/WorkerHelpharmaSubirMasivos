@@ -775,7 +775,8 @@ END
         const string sql = """
 SELECT
     u.NombreUsuario,
-    COUNT(fp.FechaProcesamientoId) AS CantidadDiasEscaneados
+    COUNT(fp.FechaProcesamientoId) AS CantidadDiasEscaneados,
+    CONVERT(varchar(10), MAX(fp.FechaProcesamiento), 23) AS UltimoDiaEscaneado
 FROM dbo.Usuarios u
 INNER JOIN dbo.FechasProcesamiento fp ON fp.UsuarioId = u.UsuarioId
 GROUP BY u.NombreUsuario
@@ -793,7 +794,8 @@ ORDER BY u.NombreUsuario;
                     usuarios.Add(new UsuarioEscaneoResumen
                     {
                         NombreUsuario = reader.GetString(0),
-                        CantidadDiasEscaneados = reader.GetInt32(1)
+                        CantidadDiasEscaneados = reader.GetInt32(1),
+                        UltimoDiaEscaneado = reader.GetString(2)
                     });
                 }
 

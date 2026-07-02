@@ -22,6 +22,7 @@ else
                     <tr>
                         <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.Usuario</th>
                         <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.DiasEscaneados</th>
+                        <th>@GestionArchivosEscaneados.Constants.EtiquetasUi.UltimoDiaEscaneado</th>
                         <th class="tx-fechas-action-col"></th>
                     </tr>
                 </thead>
@@ -31,6 +32,7 @@ else
                         <tr role="button" onclick="window.location='@Url.Action("Fechas", new { usuario = item.NombreUsuario })'">
                             <td>@item.NombreUsuario</td>
                             <td>@item.CantidadDiasEscaneados</td>
+                            <td>@item.UltimoDiaEscaneado</td>
                             <td class="text-muted tx-fechas-action-col">&rarr;</td>
                         </tr>
                     }

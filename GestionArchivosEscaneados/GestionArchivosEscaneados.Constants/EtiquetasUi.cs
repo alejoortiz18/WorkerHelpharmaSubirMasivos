@@ -46,6 +46,7 @@ public static class EtiquetasUi
     public const string TotalArchivos = "Total archivos";
     public const string TotalEscaneo = "Total escaneo";
     public const string DiasEscaneados = "Días escaneados";
+    public const string UltimoDiaEscaneado = "Último día escaneado";
     public const string FilasPorPagina = "Filas por página";
     public const string Pagina = "Página";
     public const string De = "de";
