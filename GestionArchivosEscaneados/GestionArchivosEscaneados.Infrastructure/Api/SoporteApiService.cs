@@ -1,6 +1,6 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using GestionArchivosEscaneados.Infrastructure.Configuracion;
 using GestionArchivosEscaneados.Models.Dto;
 using Microsoft.Extensions.Logging;
@@ -9,6 +9,12 @@ namespace GestionArchivosEscaneados.Infrastructure.Api;
 
 public class SoporteApiService
 {
+    private static readonly JsonSerializerOptions SoporteJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString
+    };
+
     private readonly HttpClient _httpClient;
     private readonly IIntegracionConfigProvider _config;
     private readonly ILogger<SoporteApiService> _logger;
@@ -60,8 +66,7 @@ public class SoporteApiService
                 return null;
             }
 
-            return JsonSerializer.Deserialize<SoporteResponseDto>(contenido,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return JsonSerializer.Deserialize<SoporteResponseDto>(contenido, SoporteJsonOptions);
         }
         catch (Exception ex)
         {

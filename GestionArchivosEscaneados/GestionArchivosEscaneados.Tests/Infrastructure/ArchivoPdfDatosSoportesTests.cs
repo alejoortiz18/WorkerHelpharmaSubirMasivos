@@ -58,7 +58,7 @@ public class ArchivoPdfDatosSoportesTests
         Console.WriteLine(string.Join(Environment.NewLine, trace.Lines));
         respuesta.Should().NotBeNull($"La API DatosSoportes debe responder para soporte {Soporte}. Logs:\n{trace.Text}");
         respuesta!.NombrePaciente.Should().NotBeNullOrWhiteSpace();
-        respuesta.IdPaciente.Should().BeGreaterThan(0);
+        respuesta.IdPaciente.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]

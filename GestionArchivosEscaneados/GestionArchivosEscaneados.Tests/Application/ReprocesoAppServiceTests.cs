@@ -285,7 +285,7 @@ public class ReprocesoAppServiceTests
                       "IdCartera": "C1",
                       "NombrePaciente": "Paciente prueba",
                       "IdTipoId": "CC",
-                      "IdPaciente": 1,
+                      "IdPaciente": "1",
                       "Celular": "3000000000",
                       "Telefono": "3000000001",
                       "Direccion": "Direccion",

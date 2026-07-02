@@ -24,7 +24,7 @@ public class SoporteResponseDto
 
     public string? IdTipoId { get; set; }
 
-    public int IdPaciente { get; set; }
+    public string? IdPaciente { get; set; }
 
     public string? Celular { get; set; }
 
