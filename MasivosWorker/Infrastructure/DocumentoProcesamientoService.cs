@@ -95,7 +95,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                     Estado = DocumentoProcesamientoEstado.FalloApiFisico,
                     Documento = documento,
                     Soporte = soporte,
-                    IdPaciente = resultado.Datos?.IdPaciente,
+                    IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                     IdBodega = resultado.Datos?.IdBodega,
                     IdCartera = resultado.Datos?.IdCartera,
                     FechaFactura = resultado.Datos?.Fecha
@@ -107,7 +107,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Estado = DocumentoProcesamientoEstado.Exito,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente,
+                IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                 IdBodega = resultado.Datos?.IdBodega,
                 IdCartera = resultado.Datos?.IdCartera,
                 FechaFactura = resultado.Datos?.Fecha
@@ -156,7 +156,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Estado = DocumentoProcesamientoEstado.FalloApiFisico,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente,
+                IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                 IdBodega = resultado.Datos?.IdBodega,
                 IdCartera = resultado.Datos?.IdCartera,
                 FechaFactura = resultado.Datos?.Fecha
@@ -166,7 +166,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
                 Estado = DocumentoProcesamientoEstado.Exito,
                 Documento = documento,
                 Soporte = soporte,
-                IdPaciente = resultado.Datos?.IdPaciente,
+                IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                 IdBodega = resultado.Datos?.IdBodega,
                 IdCartera = resultado.Datos?.IdCartera,
                 FechaFactura = resultado.Datos?.Fecha
@@ -194,7 +194,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
             {
                 Estado = DocumentoProcesamientoEstado.FalloApiFisico,
                 Soporte = soporteConsulta,
-                IdPaciente = resultado.Datos?.IdPaciente,
+                IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                 IdBodega = resultado.Datos?.IdBodega,
                 IdCartera = resultado.Datos?.IdCartera,
                 FechaFactura = resultado.Datos?.Fecha
@@ -203,7 +203,7 @@ public class DocumentoProcesamientoService : IDocumentoProcesamientoService
             {
                 Estado = DocumentoProcesamientoEstado.Exito,
                 Soporte = soporteConsulta,
-                IdPaciente = resultado.Datos?.IdPaciente,
+                IdPaciente = SoporteIdPacienteParser.ParaSql(resultado.Datos?.IdPaciente),
                 IdBodega = resultado.Datos?.IdBodega,
                 IdCartera = resultado.Datos?.IdCartera,
                 FechaFactura = resultado.Datos?.Fecha

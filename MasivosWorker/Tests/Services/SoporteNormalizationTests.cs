@@ -74,7 +74,7 @@ public class SoporteNormalizationTests
                     IdCartera = "C1",
                     NombrePaciente = "Paciente Prueba",
                     IdTipoId = "CC",
-                    IdPaciente = 123,
+                    IdPaciente = "123",
                     Celular = "3000000000",
                     Telefono = "3000000001",
                     Direccion = "Direccion",

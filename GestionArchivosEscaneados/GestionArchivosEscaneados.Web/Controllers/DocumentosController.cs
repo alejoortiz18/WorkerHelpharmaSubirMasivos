@@ -178,6 +178,36 @@ public class DocumentosController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProcesarDocumento(ProcesarDocumentoRequest request, CancellationToken cancellationToken)
+    {
+        var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;
+
+        if (string.IsNullOrWhiteSpace(request.NombreArchivo) || string.IsNullOrWhiteSpace(request.CodigoBarras))
+        {
+            return BadRequest(new
+            {
+                exito = false,
+                estado = SoporteProcesamientoEstado.ErrorInesperado.ToString()
+            });
+        }
+
+        var result = await _reproceso.ProcesarItemAsync(
+            usuario,
+            request.Fecha,
+            request.NombreArchivo,
+            request.CodigoBarras,
+            cancellationToken);
+
+        return Json(new
+        {
+            exito = result.Exito,
+            estado = result.Estado.ToString(),
+            nombreArchivo = result.NombreArchivo
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ReprocesarDocumento(ReprocesarDocumentoRequest request, CancellationToken cancellationToken)
     {
         var usuario = HttpContext.Session.GetString(SessionKeys.Usuario)!;

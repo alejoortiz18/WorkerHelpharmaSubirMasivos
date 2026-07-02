@@ -45,7 +45,7 @@ public class SoporteFisicoApiService
             form.Add(new StringContent(data.IdCartera ?? ""), "idCartera");
             form.Add(new StringContent(data.NombrePaciente ?? ""), "nombrePaciente");
             form.Add(new StringContent(data.IdTipoId ?? ""), "idTipoId");
-            form.Add(new StringContent(data.IdPaciente.ToString()), "idPaciente");
+            form.Add(new StringContent(data.IdPaciente ?? ""), "idPaciente");
             form.Add(new StringContent(data.Celular ?? ""), "celular");
             form.Add(new StringContent(data.Telefono ?? ""), "telefono");
             form.Add(new StringContent(data.Direccion ?? ""), "direccion");

@@ -1,4 +1,4 @@
-namespace GestionArchivosEscaneados.Infrastructure.Api;
+namespace Services;
 
 /// <summary>
 /// Variantes OCR frecuentes para reintentar DatosSoportes sin cambiar la lectura OpenAI.

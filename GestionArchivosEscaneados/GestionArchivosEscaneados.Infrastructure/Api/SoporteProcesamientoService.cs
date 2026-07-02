@@ -87,7 +87,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         string soporteConsulta,
         CancellationToken cancellationToken)
     {
-        foreach (var candidato in SoporteCodigoOcrHelper.VariantesConfusionI1(soporteConsulta).Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var candidato in SoporteCodigoOcrHelper.VariantesConsultaDatosSoportes(soporteConsulta).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

@@ -85,6 +85,15 @@ public class ReprocesarDocumentoRequest
     public string NombreArchivo { get; set; } = string.Empty;
 }
 
+public class ProcesarDocumentoRequest
+{
+    public string Fecha { get; set; } = string.Empty;
+
+    public string NombreArchivo { get; set; } = string.Empty;
+
+    public string CodigoBarras { get; set; } = string.Empty;
+}
+
 public class EliminarDocumentoRequest
 {
     public string Fecha { get; set; } = string.Empty;

@@ -144,7 +144,7 @@
                 </div>
             </form>
             <div class="d-none mt-2" id="reprocessProgressCard">
-                <div class="small fw-semibold text-muted mb-1">Reproceso en curso</div>
+                <div class="small fw-semibold text-muted mb-1" id="batchProgressTitle">Procesando...</div>
                 <div class="progress" style="height: 18px;">
                     <div class="progress-bar bg-success text-white fw-semibold" id="reprocessProgressBar" style="width: 0%">0/0</div>
                 </div>
@@ -160,17 +160,24 @@
                         @(Model.ArchivoSeleccionado ?? "—")
                     </span>
                 </div>
-                <div class="card-body p-0 pdf-viewer-wrap">
-                    @if (!string.IsNullOrWhiteSpace(Model.ArchivoSeleccionado))
+                <div class="card-body p-0 pdf-viewer-wrap" id="pdfViewerWrap">
+                    <div class="pdf-preview-loading" id="pdfPreviewLoading" aria-live="polite" aria-hidden="true">
+                        <div class="pdf-preview-loading-inner">
+                            <div class="pdf-preview-spinner" role="status" aria-label="Cargando documento"></div>
+                            <p class="pdf-preview-loading-text mb-0">
+                                Cargando<span class="pdf-loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+                            </p>
+                        </div>
+                    </div>
+                    @if (string.IsNullOrWhiteSpace(Model.ArchivoSeleccionado))
                     {
-                        <iframe title="PDF"
-                                id="pdfFrame"
-                                src="@Url.Action("Pdf", new { fecha = Model.Fecha, archivo = Model.ArchivoSeleccionado })"
-                                class="pdf-frame"></iframe>
+                        <div class="pdf-placeholder text-muted" id="pdfPlaceholder">
+                            @GestionArchivosEscaneados.Constants.EtiquetasUi.SeleccionarDocumento
+                        </div>
                     }
                     else
                     {
-                        <div class="pdf-placeholder text-muted" id="pdfPlaceholder">
+                        <div class="pdf-placeholder text-muted d-none" id="pdfPlaceholder">
                             @GestionArchivosEscaneados.Constants.EtiquetasUi.SeleccionarDocumento
                         </div>
                     }
@@ -214,13 +221,21 @@
             const btnProcesar = document.getElementById('btnProcesar');
             const btnReprocesar = document.getElementById('btnReprocesar');
             const reprocessUrl = '@Url.Action("ReprocesarDocumento")';
+            const procesarUrl = '@Url.Action("ProcesarDocumento")';
             const countListos = document.getElementById('countListos');
             const reprocessInlineStatus = document.getElementById('reprocessInlineStatus');
             const progressCard = document.getElementById('reprocessProgressCard');
+            const progressTitle = document.getElementById('batchProgressTitle');
             const progressText = document.getElementById('reprocessProgressText');
             const progressBar = document.getElementById('reprocessProgressBar');
-            const pdfFrame = document.getElementById('pdfFrame');
             const previewFileName = document.getElementById('previewFileName');
+            const pdfPreviewLoading = document.getElementById('pdfPreviewLoading');
+            const pdfViewerWrap = document.getElementById('pdfViewerWrap');
+            const initialPreviewUrl = '@(!string.IsNullOrWhiteSpace(Model.ArchivoSeleccionado) ? Url.Action("Pdf", new { fecha = Model.Fecha, archivo = Model.ArchivoSeleccionado }) : "")';
+            const initialPreviewArchivo = '@(Model.ArchivoSeleccionado ?? "")';
+            let previewLoadToken = 0;
+            let previewArchivoActual = initialPreviewArchivo || null;
+            let previewBlobUrl = null;
             const inputs = form.querySelectorAll('.barcode-input');
             const rows = Array.from(form.querySelectorAll('.docs-row'));
 
@@ -247,13 +262,68 @@
                 progressBar.style.width = total > 0 ? `${Math.max(0, Math.min(100, (done / total) * 100))}%` : '0%';
             }
 
+            function iniciarProgreso(total, titulo) {
+                btnReprocesar.disabled = true;
+                btnProcesar.disabled = true;
+                form.querySelectorAll('.barcode-input').forEach(input => input.disabled = true);
+                progressCard?.classList.remove('d-none');
+                if (progressTitle) {
+                    progressTitle.textContent = titulo;
+                }
+                if (reprocessInlineStatus) {
+                    reprocessInlineStatus.textContent = 'Procesando archivos...';
+                    reprocessInlineStatus.classList.remove('d-none');
+                }
+                updateProgress(0, total);
+            }
+
+            function filasConCodigoBarras() {
+                return rows.filter(row => {
+                    const input = row.querySelector('.barcode-input');
+                    return input && !input.disabled && input.value.trim();
+                });
+            }
+
+            async function procesarFila(row, index, total) {
+                const nombreArchivo = row.dataset.archivo ?? '';
+                const codigoBarras = row.querySelector('.barcode-input')?.value.trim() ?? '';
+                if (!nombreArchivo || !codigoBarras) {
+                    return { skipped: true };
+                }
+
+                const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+                const payload = new FormData();
+                payload.append('__RequestVerificationToken', token);
+                payload.append('Fecha', document.querySelector('input[name="Fecha"]')?.value ?? '');
+                payload.append('NombreArchivo', nombreArchivo);
+                payload.append('CodigoBarras', codigoBarras);
+
+                let response;
+                try {
+                    response = await fetch(procesarUrl, {
+                        method: 'POST',
+                        body: payload
+                    });
+                } catch (error) {
+                    updateProgress(index, total);
+                    return { skipped: false, exito: false, estado: 'ErrorInesperado' };
+                }
+
+                if (!response.ok) {
+                    updateProgress(index, total);
+                    return { skipped: false, exito: false, estado: 'ErrorInesperado' };
+                }
+
+                const result = await response.json();
+                updateProgress(index, total);
+                return { skipped: false, estado: result.estado, exito: !!result.exito };
+            }
+
             async function reprocesarFila(row, index, total) {
                 const nombreArchivo = row.dataset.archivo ?? '';
                 if (!nombreArchivo) {
                     return { skipped: true };
                 }
-
-                marcarFilaReprocesada(row);
 
                 const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
                 const payload = new FormData();
@@ -279,7 +349,61 @@
 
                 const result = await response.json();
                 updateProgress(index, total);
+                if (result.exito) {
+                    marcarFilaReprocesada(row);
+                }
                 return { skipped: false, estado: result.estado, exito: !!result.exito };
+            }
+
+            function guardarResumenLote(tipo, exitos, fallos) {
+                sessionStorage.setItem('docsLoteResumen', JSON.stringify({ tipo, exitos, fallos }));
+            }
+
+            function mostrarResumenLote() {
+                const raw = sessionStorage.getItem('docsLoteResumen');
+                if (!raw) return;
+
+                sessionStorage.removeItem('docsLoteResumen');
+                let resumen;
+                try {
+                    resumen = JSON.parse(raw);
+                } catch {
+                    return;
+                }
+
+                const { tipo, exitos, fallos } = resumen;
+                let mensaje = '';
+                let clase = 'alert-info';
+
+                if (exitos > 0 && fallos === 0) {
+                    mensaje = `${exitos} documento(s) procesado(s) correctamente.`;
+                    clase = 'alert-success';
+                } else if (exitos > 0 && fallos > 0) {
+                    mensaje = `${exitos} documento(s) procesado(s). ${fallos} documento(s) con error.`;
+                    clase = 'alert-warning';
+                } else if (fallos > 0) {
+                    mensaje = tipo === 'reproceso'
+                        ? `No se pudo reprocesar ${fallos} documento(s). Verifique los archivos o contacte al administrador.`
+                        : `No se pudo procesar ${fallos} documento(s). Verifique el codigo de barras o contacte al administrador.`;
+                    clase = 'alert-danger';
+                } else {
+                    return;
+                }
+
+                const contenedor = document.querySelector('.docs-workspace');
+                if (!contenedor) return;
+
+                const alerta = document.createElement('div');
+                alerta.className = `alert ${clase} docs-alert`;
+                alerta.textContent = mensaje;
+                contenedor.insertBefore(alerta, contenedor.querySelector('.row'));
+            }
+
+            function finalizarLote(tipo, resultados) {
+                const exitos = resultados.filter(r => r.exito).length;
+                const fallos = resultados.filter(r => !r.skipped && !r.exito).length;
+                guardarResumenLote(tipo, exitos, fallos);
+                setTimeout(() => window.location.reload(), 500);
             }
 
             function marcarFilaReprocesada(row) {
@@ -296,6 +420,98 @@
                 badge.title = 'Este soporte ya fue reprocesado';
                 badge.textContent = 'Reprocesado';
                 meta.appendChild(badge);
+            }
+
+            function mostrarSpinnerPreview() {
+                if (!pdfPreviewLoading) return;
+                pdfPreviewLoading.classList.add('is-active');
+                pdfPreviewLoading.setAttribute('aria-hidden', 'false');
+                pdfViewerWrap?.classList.add('is-loading');
+            }
+
+            function ocultarSpinnerPreview() {
+                if (!pdfPreviewLoading) return;
+                pdfPreviewLoading.classList.remove('is-active');
+                pdfPreviewLoading.setAttribute('aria-hidden', 'true');
+                pdfViewerWrap?.classList.remove('is-loading');
+            }
+
+            function esperar(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            function cerrarPreviewActual() {
+                const frame = document.getElementById('pdfFrame');
+                if (frame) {
+                    frame.src = 'about:blank';
+                    frame.remove();
+                }
+
+                if (previewBlobUrl) {
+                    URL.revokeObjectURL(previewBlobUrl);
+                    previewBlobUrl = null;
+                }
+            }
+
+            async function abrirPreview(pdfUrl, archivo) {
+                if (!pdfViewerWrap || !pdfUrl) return;
+
+                const loadToken = ++previewLoadToken;
+                const inicioCarga = Date.now();
+                const duracionMinimaMs = 450;
+
+                cerrarPreviewActual();
+                document.getElementById('pdfPlaceholder')?.classList.add('d-none');
+                previewArchivoActual = archivo;
+                mostrarSpinnerPreview();
+
+                try {
+                    const response = await fetch(pdfUrl, { credentials: 'same-origin' });
+                    if (loadToken !== previewLoadToken) return;
+
+                    if (!response.ok) {
+                        throw new Error('No se pudo cargar el PDF');
+                    }
+
+                    const blob = await response.blob();
+                    if (loadToken !== previewLoadToken) return;
+
+                    previewBlobUrl = URL.createObjectURL(blob);
+
+                    const frame = document.createElement('iframe');
+                    frame.id = 'pdfFrame';
+                    frame.className = 'pdf-frame';
+                    frame.title = 'PDF';
+
+                    await new Promise(resolve => {
+                        frame.addEventListener('load', resolve, { once: true });
+                        frame.addEventListener('error', resolve, { once: true });
+                        pdfViewerWrap.appendChild(frame);
+                        frame.src = previewBlobUrl;
+                    });
+
+                    if (loadToken !== previewLoadToken) return;
+
+                    const transcurrido = Date.now() - inicioCarga;
+                    if (transcurrido < duracionMinimaMs) {
+                        await esperar(duracionMinimaMs - transcurrido);
+                    }
+
+                    if (loadToken !== previewLoadToken) return;
+                    ocultarSpinnerPreview();
+                } catch {
+                    if (loadToken !== previewLoadToken) return;
+
+                    cerrarPreviewActual();
+                    ocultarSpinnerPreview();
+                    previewArchivoActual = null;
+
+                    const placeholder = document.getElementById('pdfPlaceholder');
+                    if (placeholder) {
+                        placeholder.textContent = 'No se pudo cargar la vista previa del documento.';
+                        placeholder.classList.remove('d-none');
+                    }
+                }
             }
 
             function selectRow(row, focusBarcode) {
@@ -320,17 +536,11 @@
                 hiddenSeleccionado.value = archivo;
                 previewFileName.textContent = archivo;
 
-                let frame = document.getElementById('pdfFrame');
-                if (!frame) {
-                    const wrap = document.querySelector('.pdf-viewer-wrap');
-                    wrap.innerHTML = '';
-                    frame = document.createElement('iframe');
-                    frame.id = 'pdfFrame';
-                    frame.className = 'pdf-frame';
-                    frame.title = 'PDF';
-                    wrap.appendChild(frame);
+                if (archivo !== previewArchivoActual || !document.getElementById('pdfFrame')) {
+                    abrirPreview(pdfUrl, archivo);
+                } else {
+                    ocultarSpinnerPreview();
                 }
-                frame.src = pdfUrl;
 
                 row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
@@ -366,24 +576,37 @@
                 const total = reprocessRows.length;
                 if (total === 0) return;
 
-                btnReprocesar.disabled = true;
-                btnProcesar.disabled = true;
-                form.querySelectorAll('.barcode-input').forEach(input => input.disabled = true);
-                progressCard?.classList.remove('d-none');
-                if (reprocessInlineStatus) {
-                    reprocessInlineStatus.textContent = 'Procesando archivos...';
-                    reprocessInlineStatus.classList.remove('d-none');
-                }
-                updateProgress(0, total);
+                iniciarProgreso(total, 'Reproceso en curso');
 
+                const resultados = [];
                 let done = 0;
                 for (const row of reprocessRows) {
-                    await reprocesarFila(row, done + 1, total);
+                    resultados.push(await reprocesarFila(row, done + 1, total));
                     done++;
                     updateProgress(done, total);
                 }
 
-                setTimeout(() => window.location.reload(), 500);
+                finalizarLote('reproceso', resultados);
+            });
+
+            form.addEventListener('submit', async e => {
+                e.preventDefault();
+
+                const processRows = filasConCodigoBarras();
+                const total = processRows.length;
+                if (total === 0) return;
+
+                iniciarProgreso(total, 'Procesamiento en curso');
+
+                const resultados = [];
+                let done = 0;
+                for (const row of processRows) {
+                    resultados.push(await procesarFila(row, done + 1, total));
+                    done++;
+                    updateProgress(done, total);
+                }
+
+                finalizarLote('proceso', resultados);
             });
 
             inputs.forEach((input, idx) => {
@@ -400,6 +623,10 @@
             });
 
             updateProcessButton();
+            mostrarResumenLote();
+            if (initialPreviewUrl && initialPreviewArchivo) {
+                abrirPreview(initialPreviewUrl, initialPreviewArchivo);
+            }
             if (progressCard) {
                 updateProgress(0, rows.filter(row => row.dataset.intentoPrevio !== 'true').length);
             }

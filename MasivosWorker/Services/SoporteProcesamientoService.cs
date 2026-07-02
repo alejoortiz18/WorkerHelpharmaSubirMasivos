@@ -5,7 +5,7 @@ namespace Services;
 
 /// <summary>
 /// Orquesta el mismo flujo de APIs que usa MasivosWorker al procesar un PDF con código de barras conocido:
-/// 1) POST DatosSoportes con el código
+/// 1) POST DatosSoportes con el código (y variantes OCR)
 /// 2) POST soporte/fisico con datos + PDF completo
 /// El portal MVC debe usar esta clase (no reimplementar las llamadas HTTP).
 /// </summary>
@@ -39,8 +39,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
 
         var soporteConsulta = soporte.Trim();
 
-        var respuesta = await _soporteApi.EnviarSoporteAsync(soporteConsulta);
-
+        var (respuesta, soporteResuelto) = await ConsultarDatosSoporteAsync(soporteConsulta, cancellationToken);
         if (respuesta == null)
         {
             _logger.LogError(
@@ -58,7 +57,7 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         cancellationToken.ThrowIfCancellationRequested();
 
         var enviadoFisico = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
-            soporteConsulta,
+            soporteResuelto,
             rutaArchivoPdf,
             respuesta);
 
@@ -66,27 +65,53 @@ public class SoporteProcesamientoService : ISoporteProcesamientoService
         {
             _logger.LogError(
                 "FalloApiFisico | Soporte={Soporte} | Ruta={Ruta}",
-                soporteConsulta,
+                soporteResuelto,
                 rutaArchivoPdf);
 
             return new SoporteProcesamientoResult
             {
                 Estado = SoporteProcesamientoEstado.FalloApiFisico,
-                Soporte = soporteConsulta,
+                Soporte = soporteResuelto,
                 Datos = respuesta
             };
         }
 
         _logger.LogInformation(
             "SoporteProcesamientoOK | Soporte={Soporte} | Paciente={Paciente}",
-            soporteConsulta,
+            soporteResuelto,
             respuesta.NombrePaciente);
 
         return new SoporteProcesamientoResult
         {
             Estado = SoporteProcesamientoEstado.Exito,
-            Soporte = soporteConsulta,
+            Soporte = soporteResuelto,
             Datos = respuesta
         };
+    }
+
+    private async Task<(SoporteResponseDto? Datos, string SoporteResuelto)> ConsultarDatosSoporteAsync(
+        string soporteConsulta,
+        CancellationToken cancellationToken)
+    {
+        foreach (var candidato in SoporteCodigoOcrHelper.VariantesConsultaDatosSoportes(soporteConsulta).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var respuesta = await _soporteApi.EnviarSoporteAsync(candidato);
+            if (respuesta == null)
+                continue;
+
+            if (!string.Equals(candidato, soporteConsulta, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation(
+                    "ApiSoporteOcrCorreccion | SoporteLeido={SoporteLeido} | SoporteResuelto={SoporteResuelto}",
+                    soporteConsulta,
+                    candidato);
+            }
+
+            return (respuesta, candidato);
+        }
+
+        return (null, soporteConsulta);
     }
 }

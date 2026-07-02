@@ -1,6 +1,6 @@
-﻿using System.Net.Http.Headers;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Models.Dto;
@@ -9,6 +9,12 @@ namespace Services;
 
 public class SoporteApiService
 {
+    private static readonly JsonSerializerOptions SoporteJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowReadingFromString
+    };
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<SoporteApiService> _logger;
     private readonly string _apiKey;
@@ -44,12 +50,16 @@ public class SoporteApiService
 
             if (response.IsSuccessStatusCode)
             {
-                var opciones = new JsonSerializerOptions
+                if (string.IsNullOrWhiteSpace(contenido))
                 {
-                    PropertyNameCaseInsensitive = true
-                };
+                    _logger.LogError(
+                        "ApiSoporteError | Soporte={Soporte} | Status={Status} | Respuesta=vacia",
+                        soporteConsulta,
+                        response.StatusCode);
+                    return null;
+                }
 
-                var resultado = JsonSerializer.Deserialize<SoporteResponseDto>(contenido, opciones);
+                var resultado = JsonSerializer.Deserialize<SoporteResponseDto>(contenido, SoporteJsonOptions);
 
                 _logger.LogInformation(
                     "ApiSoporteOK | Soporte={Soporte} | Paciente={Paciente}",
