@@ -1,5 +1,6 @@
 using System.Globalization;
 using GestionArchivosEscaneados.Constants;
+using GestionArchivosEscaneados.Models.Dto;
 using GestionArchivosEscaneados.Models.Entities;
 using GestionArchivosEscaneados.Models.Settings;
 using Microsoft.Data.SqlClient;
@@ -102,6 +103,59 @@ public interface ITrazabilidadConsultaSqlService
     Task<bool> ProbarConexionSqlAsync(
         string? connectionStringOverride = null,
         CancellationToken cancellationToken = default);
+
+    Task<(IReadOnlyList<RadicaWebNotificacionConsulta> Items, int Total)> ListarRadicaWebNotificacionesAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        int pagina,
+        int tamanoPagina,
+        CancellationToken cancellationToken = default);
+
+    Task<RadicaWebNotificacionConsulta?> ObtenerRadicaWebNotificacionAsync(
+        long radicaWebApiId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ActualizarRadicaWebNotificacionAsync(
+        long radicaWebApiId,
+        RadicaWebBusquedaResultado resultado,
+        CancellationToken cancellationToken = default);
+
+    Task<RadicaWebKpiResumen> ObtenerRadicaWebKpiResumenAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RadicaWebUsuarioKpi>> ListarRadicaWebKpiPorUsuarioAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RadicaWebBodegaKpi>> ListarRadicaWebKpiPorBodegaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RadicaWebFechaFacturaKpi>> ListarRadicaWebKpiPorFechaFacturaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> ListarUsuariosRadicaWebAsync(CancellationToken cancellationToken = default);
 }
 
 public class TrazabilidadConsultaSqlService : ITrazabilidadConsultaSqlService
@@ -1011,6 +1065,399 @@ ORDER BY YEAR(fp.FechaProcesamiento) DESC, MONTH(fp.FechaProcesamiento) DESC;
             command => AgregarFiltrosInforme(command, desde, hasta, nombreUsuario));
     }
 
+    public async Task<(IReadOnlyList<RadicaWebNotificacionConsulta> Items, int Total)> ListarRadicaWebNotificacionesAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        int pagina,
+        int tamanoPagina,
+        CancellationToken cancellationToken = default)
+    {
+        pagina = Math.Max(1, pagina);
+        tamanoPagina = Math.Clamp(tamanoPagina, 5, 100);
+        var offset = (pagina - 1) * tamanoPagina;
+
+        const string countSql = """
+SELECT COUNT(*)
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success);
+""";
+
+        const string listSql = """
+SELECT
+    rw.RadicaWebApiId,
+    u.NombreUsuario,
+    rw.FechaFactura,
+    rw.Bodega,
+    rw.Success,
+    rw.Message,
+    rw.SolicitudId,
+    rw.RegistrosInsertados,
+    rw.TotalRegistros,
+    rw.JobId,
+    rw.StatusCode,
+    rw.Error,
+    rw.Timestamp,
+    rw.Path,
+    rw.CreadoEn
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success)
+ORDER BY rw.CreadoEn DESC, rw.RadicaWebApiId DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+""";
+
+        void ConfigurarFiltros(SqlCommand command)
+        {
+            AgregarFiltrosRadicaWeb(command, desde, hasta, nombreUsuario, bodega, success);
+            command.Parameters.AddWithValue("@Offset", offset);
+            command.Parameters.AddWithValue("@PageSize", tamanoPagina);
+        }
+
+        var total = await EjecutarScalarAsync(
+            countSql,
+            async command => Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)),
+            cancellationToken,
+            ConfigurarFiltros);
+
+        var items = await EjecutarReaderAsync(
+            listSql,
+            async command =>
+            {
+                var lista = new List<RadicaWebNotificacionConsulta>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    lista.Add(LeerRadicaWebNotificacion(reader));
+
+                return (IReadOnlyList<RadicaWebNotificacionConsulta>)lista;
+            },
+            cancellationToken,
+            ConfigurarFiltros);
+
+        return (items, total);
+    }
+
+    public Task<RadicaWebNotificacionConsulta?> ObtenerRadicaWebNotificacionAsync(
+        long radicaWebApiId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    rw.RadicaWebApiId,
+    u.NombreUsuario,
+    rw.FechaFactura,
+    rw.Bodega,
+    rw.Success,
+    rw.Message,
+    rw.SolicitudId,
+    rw.RegistrosInsertados,
+    rw.TotalRegistros,
+    rw.JobId,
+    rw.StatusCode,
+    rw.Error,
+    rw.Timestamp,
+    rw.Path,
+    rw.CreadoEn
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE rw.RadicaWebApiId = @RadicaWebApiId;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                if (!await reader.ReadAsync(cancellationToken))
+                    return null;
+
+                return LeerRadicaWebNotificacion(reader);
+            },
+            cancellationToken,
+            command => command.Parameters.AddWithValue("@RadicaWebApiId", radicaWebApiId));
+    }
+
+    public async Task<bool> ActualizarRadicaWebNotificacionAsync(
+        long radicaWebApiId,
+        RadicaWebBusquedaResultado resultado,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+UPDATE dbo.RadicaWebAPI
+SET
+    Success = @Success,
+    Message = @Message,
+    SolicitudId = @SolicitudId,
+    RegistrosInsertados = @RegistrosInsertados,
+    TotalRegistros = @TotalRegistros,
+    JobId = @JobId,
+    StatusCode = @StatusCode,
+    Error = @Error,
+    Timestamp = @Timestamp,
+    Path = @Path
+WHERE RadicaWebApiId = @RadicaWebApiId;
+""";
+
+        await EjecutarNonQueryAsync(
+            sql,
+            cancellationToken,
+            command =>
+            {
+                command.Parameters.AddWithValue("@RadicaWebApiId", radicaWebApiId);
+                command.Parameters.Add("@Success", System.Data.SqlDbType.Bit).Value =
+                    (object?)resultado.Success ?? DBNull.Value;
+                command.Parameters.Add("@Message", System.Data.SqlDbType.NVarChar, -1).Value =
+                    (object?)resultado.Message ?? DBNull.Value;
+                command.Parameters.Add("@SolicitudId", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.SolicitudId ?? DBNull.Value;
+                command.Parameters.Add("@RegistrosInsertados", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.RegistrosInsertados ?? DBNull.Value;
+                command.Parameters.Add("@TotalRegistros", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.TotalRegistros ?? DBNull.Value;
+                command.Parameters.Add("@JobId", System.Data.SqlDbType.NVarChar, 200).Value =
+                    (object?)resultado.JobId ?? DBNull.Value;
+                command.Parameters.Add("@StatusCode", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.HttpStatusCode ?? DBNull.Value;
+                command.Parameters.Add("@Error", System.Data.SqlDbType.NVarChar, 200).Value =
+                    (object?)resultado.Error ?? DBNull.Value;
+                command.Parameters.Add("@Timestamp", System.Data.SqlDbType.DateTimeOffset).Value =
+                    (object?)resultado.Timestamp ?? DBNull.Value;
+                command.Parameters.Add("@Path", System.Data.SqlDbType.NVarChar, 500).Value =
+                    (object?)resultado.Path ?? DBNull.Value;
+            });
+
+        return true;
+    }
+
+    public Task<RadicaWebKpiResumen> ObtenerRadicaWebKpiResumenAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    COUNT(*) AS Total,
+    SUM(CASE WHEN rw.Success = 1 THEN 1 ELSE 0 END) AS Exitosas,
+    SUM(CASE WHEN rw.Success = 0 THEN 1 ELSE 0 END) AS Fallidas,
+    SUM(CASE WHEN rw.Success IS NULL THEN 1 ELSE 0 END) AS SinResultado,
+    COUNT(DISTINCT u.NombreUsuario) AS UsuariosDistintos,
+    COUNT(DISTINCT rw.Bodega) AS BodegasDistintas
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success);
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                if (!await reader.ReadAsync(cancellationToken))
+                {
+                    return new RadicaWebKpiResumen();
+                }
+
+                return new RadicaWebKpiResumen
+                {
+                    Total = reader.GetInt32(0),
+                    Exitosas = reader.GetInt32(1),
+                    Fallidas = reader.GetInt32(2),
+                    SinResultado = reader.GetInt32(3),
+                    UsuariosDistintos = reader.GetInt32(4),
+                    BodegasDistintas = reader.GetInt32(5)
+                };
+            },
+            cancellationToken,
+            command => AgregarFiltrosRadicaWeb(command, desde, hasta, nombreUsuario, bodega, success));
+    }
+
+    public Task<IReadOnlyList<RadicaWebUsuarioKpi>> ListarRadicaWebKpiPorUsuarioAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    u.NombreUsuario,
+    COUNT(*) AS Total,
+    SUM(CASE WHEN rw.Success = 1 THEN 1 ELSE 0 END) AS Exitosas,
+    SUM(CASE WHEN rw.Success = 0 THEN 1 ELSE 0 END) AS Fallidas,
+    SUM(CASE WHEN rw.Success IS NULL OR rw.Success = 0 THEN 1 ELSE 0 END) AS SinNotificar
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success)
+GROUP BY u.NombreUsuario
+ORDER BY COUNT(*) DESC, u.NombreUsuario;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<RadicaWebUsuarioKpi>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new RadicaWebUsuarioKpi
+                    {
+                        NombreUsuario = reader.GetString(0),
+                        Total = reader.GetInt32(1),
+                        Exitosas = reader.GetInt32(2),
+                        Fallidas = reader.GetInt32(3),
+                        SinNotificar = reader.GetInt32(4)
+                    });
+                }
+
+                return (IReadOnlyList<RadicaWebUsuarioKpi>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosRadicaWeb(command, desde, hasta, nombreUsuario, bodega, success));
+    }
+
+    public Task<IReadOnlyList<RadicaWebBodegaKpi>> ListarRadicaWebKpiPorBodegaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    rw.Bodega,
+    COUNT(*) AS Total,
+    SUM(CASE WHEN rw.Success = 1 THEN 1 ELSE 0 END) AS Exitosas,
+    SUM(CASE WHEN rw.Success = 0 OR rw.Success IS NULL THEN 1 ELSE 0 END) AS Fallidas
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success)
+GROUP BY rw.Bodega
+ORDER BY COUNT(*) DESC, rw.Bodega;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<RadicaWebBodegaKpi>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new RadicaWebBodegaKpi
+                    {
+                        Bodega = reader.GetString(0),
+                        Total = reader.GetInt32(1),
+                        Exitosas = reader.GetInt32(2),
+                        Fallidas = reader.GetInt32(3)
+                    });
+                }
+
+                return (IReadOnlyList<RadicaWebBodegaKpi>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosRadicaWeb(command, desde, hasta, nombreUsuario, bodega, success));
+    }
+
+    public Task<IReadOnlyList<RadicaWebFechaFacturaKpi>> ListarRadicaWebKpiPorFechaFacturaAsync(
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT
+    rw.FechaFactura,
+    COUNT(*) AS Total,
+    SUM(CASE WHEN rw.Success = 1 THEN 1 ELSE 0 END) AS Exitosas,
+    SUM(CASE WHEN rw.Success = 0 OR rw.Success IS NULL THEN 1 ELSE 0 END) AS Fallidas
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+WHERE (@Desde IS NULL OR CAST(rw.CreadoEn AS date) >= @Desde)
+  AND (@Hasta IS NULL OR CAST(rw.CreadoEn AS date) <= @Hasta)
+  AND (@NombreUsuario IS NULL OR u.NombreUsuario = @NombreUsuario)
+  AND (@Bodega IS NULL OR rw.Bodega LIKE '%' + @Bodega + '%')
+  AND (@Success IS NULL OR rw.Success = @Success)
+GROUP BY rw.FechaFactura
+ORDER BY rw.FechaFactura DESC;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<RadicaWebFechaFacturaKpi>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    items.Add(new RadicaWebFechaFacturaKpi
+                    {
+                        FechaFactura = DateOnly.FromDateTime(reader.GetDateTime(0)),
+                        Total = reader.GetInt32(1),
+                        Exitosas = reader.GetInt32(2),
+                        Fallidas = reader.GetInt32(3)
+                    });
+                }
+
+                return (IReadOnlyList<RadicaWebFechaFacturaKpi>)items;
+            },
+            cancellationToken,
+            command => AgregarFiltrosRadicaWeb(command, desde, hasta, nombreUsuario, bodega, success));
+    }
+
+    public Task<IReadOnlyList<string>> ListarUsuariosRadicaWebAsync(CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT DISTINCT u.NombreUsuario
+FROM dbo.RadicaWebAPI rw
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = rw.UsuarioId
+ORDER BY u.NombreUsuario;
+""";
+
+        return EjecutarReaderAsync(
+            sql,
+            async command =>
+            {
+                var items = new List<string>();
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                    items.Add(reader.GetString(0));
+
+                return (IReadOnlyList<string>)items;
+            },
+            cancellationToken);
+    }
+
     public async Task<bool> ProbarConexionSqlAsync(
         string? connectionStringOverride = null,
         CancellationToken cancellationToken = default)
@@ -1050,6 +1497,46 @@ ORDER BY YEAR(fp.FechaProcesamiento) DESC, MONTH(fp.FechaProcesamiento) DESC;
         else
             command.Parameters.AddWithValue("@NombreUsuario", nombreUsuario.Trim());
     }
+
+    private static void AgregarFiltrosRadicaWeb(
+        SqlCommand command,
+        DateOnly? desde,
+        DateOnly? hasta,
+        string? nombreUsuario,
+        string? bodega,
+        bool? success)
+    {
+        command.Parameters.Add("@Desde", System.Data.SqlDbType.Date).Value =
+            desde.HasValue ? desde.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        command.Parameters.Add("@Hasta", System.Data.SqlDbType.Date).Value =
+            hasta.HasValue ? hasta.Value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        command.Parameters.AddWithValue("@NombreUsuario",
+            string.IsNullOrWhiteSpace(nombreUsuario) ? DBNull.Value : nombreUsuario.Trim());
+        command.Parameters.AddWithValue("@Bodega",
+            string.IsNullOrWhiteSpace(bodega) ? DBNull.Value : bodega.Trim());
+        command.Parameters.Add("@Success", System.Data.SqlDbType.Bit).Value =
+            success.HasValue ? success.Value : DBNull.Value;
+    }
+
+    private static RadicaWebNotificacionConsulta LeerRadicaWebNotificacion(SqlDataReader reader) =>
+        new()
+        {
+            RadicaWebApiId = reader.GetInt64(0),
+            NombreUsuario = reader.GetString(1),
+            FechaFactura = DateOnly.FromDateTime(reader.GetDateTime(2)),
+            Bodega = reader.GetString(3),
+            Success = reader.IsDBNull(4) ? null : reader.GetBoolean(4),
+            Message = reader.IsDBNull(5) ? null : reader.GetString(5),
+            SolicitudId = reader.IsDBNull(6) ? null : reader.GetInt32(6),
+            RegistrosInsertados = reader.IsDBNull(7) ? null : reader.GetInt32(7),
+            TotalRegistros = reader.IsDBNull(8) ? null : reader.GetInt32(8),
+            JobId = reader.IsDBNull(9) ? null : reader.GetString(9),
+            StatusCode = reader.IsDBNull(10) ? null : reader.GetInt32(10),
+            Error = reader.IsDBNull(11) ? null : reader.GetString(11),
+            Timestamp = reader.IsDBNull(12) ? null : reader.GetFieldValue<DateTimeOffset>(12),
+            Path = reader.IsDBNull(13) ? null : reader.GetString(13),
+            CreadoEn = reader.GetDateTime(14)
+        };
 
     private async Task<string> ResolveOperationalConnectionStringAsync(CancellationToken cancellationToken) =>
         _bootstrapConnectionString;

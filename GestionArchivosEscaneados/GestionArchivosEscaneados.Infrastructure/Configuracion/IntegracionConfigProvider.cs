@@ -182,6 +182,47 @@ public static class IntegracionConfigExtensions
             null,
             cancellationToken);
 
+    public static async Task<string> ObtenerRadicaWebApiUrlAsync(
+        this IIntegracionConfigProvider provider,
+        CancellationToken cancellationToken = default) =>
+        await CampoProductoAsync(
+            provider,
+            ProductoIntegracion.RadicaWeb,
+            p => p.Endpoint,
+            "RadicaWeb:ApiUrl",
+            cancellationToken) is { Length: > 0 } url
+            ? url
+            : IntegracionDefaults.RadicaWebApiUrl;
+
+    public static async Task<string> ObtenerRadicaWebApiClientAsync(
+        this IIntegracionConfigProvider provider,
+        CancellationToken cancellationToken = default) =>
+        await CampoProductoAsync(
+            provider,
+            ProductoIntegracion.RadicaWeb,
+            p => p.ClaveCredencial,
+            "RadicaWeb:ApiClient",
+            cancellationToken);
+
+    public static async Task<string> ObtenerRadicaWebApiSecretAsync(
+        this IIntegracionConfigProvider provider,
+        CancellationToken cancellationToken = default) =>
+        await CampoProductoAsync(
+            provider,
+            ProductoIntegracion.RadicaWeb,
+            p => p.ValorAdicional,
+            "RadicaWeb:ApiSecret",
+            cancellationToken);
+
+    public static async Task<bool> RadicaWebEstaConfiguradoAsync(
+        this IIntegracionConfigProvider provider,
+        CancellationToken cancellationToken = default)
+    {
+        var client = await provider.ObtenerRadicaWebApiClientAsync(cancellationToken);
+        var secret = await provider.ObtenerRadicaWebApiSecretAsync(cancellationToken);
+        return !string.IsNullOrWhiteSpace(client) && !string.IsNullOrWhiteSpace(secret);
+    }
+
     private static async Task<string> CampoProductoAsync(
         IIntegracionConfigProvider provider,
         string producto,

@@ -12,6 +12,8 @@
 
     var esInformes = controller.Equals("Informes", StringComparison.OrdinalIgnoreCase);
 
+    var esRadicaWeb = controller.Equals("RadicaWeb", StringComparison.OrdinalIgnoreCase);
+
     var esSalud = controller.Equals("Salud", StringComparison.OrdinalIgnoreCase);
 
 }
@@ -41,6 +43,14 @@
            asp-controller="Informes" asp-action="Index">
 
             @EtiquetasUi.Informes
+
+        </a>
+
+        <a class="app-sidebar-link @(esRadicaWeb ? "active" : "")"
+
+           asp-controller="RadicaWeb" asp-action="Index">
+
+            @EtiquetasUi.RadicaWeb
 
         </a>
 

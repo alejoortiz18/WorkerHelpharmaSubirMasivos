@@ -63,6 +63,7 @@ public sealed class Worker2Escenario : IDisposable
         IDocumentoProcesamientoService documento,
         IOpenAiBarcodeService? openAi = null,
         IEmailNotificationService? email = null,
+        IRadicaWebIntegracionService? radicaWeb = null,
         int tamanoLote = 3)
     {
         if (openAi is null)
@@ -72,6 +73,7 @@ public sealed class Worker2Escenario : IDisposable
                 .Returns(new OpenAiBarcodeResult { Tipo = OpenAiBarcodeResultKind.NoBarcode });
         }
         email ??= Substitute.For<IEmailNotificationService>();
+        radicaWeb ??= new NoopRadicaWebIntegracionService();
 
         var fileSettings = Options.Create(new FileSettings
         {
@@ -96,6 +98,7 @@ public sealed class Worker2Escenario : IDisposable
             openAi,
             email,
             new NoopTrazabilidadSqlService(),
+            radicaWeb,
             redDisponible,
             fileSettings,
             NullLogger<LoteProcesamientoService>.Instance);
@@ -120,6 +123,18 @@ public class Worker2ProcesamientoTests
 
     private static DocumentoProcesamientoResult Exito(string codigo = "KV351697") =>
         new() { Estado = DocumentoProcesamientoEstado.Exito, Documento = Documento(codigo) };
+
+    private static DocumentoProcesamientoResult ExitoConRadicaWeb(
+        string bodega = "FARMACIAMEDELLIN",
+        string fecha = "2026-07-02",
+        string codigo = "KV351697") =>
+        new()
+        {
+            Estado = DocumentoProcesamientoEstado.Exito,
+            Documento = Documento(codigo),
+            IdBodega = bodega,
+            FechaFactura = DateTime.ParseExact(fecha, "yyyy-MM-dd", null)
+        };
 
     private static DocumentoProcesamientoResult FalloBarcode() =>
         new() { Estado = DocumentoProcesamientoEstado.FalloBarcode };
@@ -154,6 +169,76 @@ public class Worker2ProcesamientoTests
         Directory.GetFiles(escenario.Contexto.Error).Should().BeEmpty();
 
         await documento.Received(3).ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task LoteCompleto_InvocaRadicaWebTrasOpenAiConCombinacionesUnicas()
+    {
+        using var escenario = new Worker2Escenario();
+        escenario.CrearPdfEnProcesar("doc1.pdf");
+        escenario.CrearPdfEnProcesar("doc2.pdf");
+        var txt = escenario.CrearTxtLote();
+
+        var radicaWeb = new NoopRadicaWebIntegracionService();
+        var documento = Substitute.For<IDocumentoProcesamientoService>();
+        documento.ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ExitoConRadicaWeb());
+
+        var servicio = escenario.CrearServicio(documento, radicaWeb: radicaWeb);
+
+        await servicio.ProcesarLoteAsync(txt, CancellationToken.None);
+
+        radicaWeb.Llamadas.Should().HaveCount(1);
+        radicaWeb.Llamadas[0].Combinaciones.Should().HaveCount(1);
+        radicaWeb.Llamadas[0].Combinaciones[0].Should().Be((new DateOnly(2026, 7, 2), "FARMACIAMEDELLIN"));
+    }
+
+    [Fact]
+    public async Task LoteConIncidenciaInfraestructura_InvocaRadicaWebAntesDePendienteReintento()
+    {
+        using var escenario = new Worker2Escenario();
+        escenario.CrearPdfEnProcesar("doc1.pdf");
+        escenario.CrearPdfEnProcesar("doc2.pdf");
+        var txt = escenario.CrearTxtLote();
+
+        var radicaWeb = new NoopRadicaWebIntegracionService();
+        var documento = Substitute.For<IDocumentoProcesamientoService>();
+        documento.ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(
+                _ => ExitoConRadicaWeb(),
+                _ => throw new IOException("fallo de red simulado"));
+
+        var servicio = escenario.CrearServicio(documento, radicaWeb: radicaWeb, tamanoLote: 1);
+
+        var outcome = await servicio.ProcesarLoteAsync(txt, CancellationToken.None);
+
+        outcome.Estado.Should().Be(LoteProcesamientoEstado.PendienteReintento);
+        radicaWeb.Llamadas.Should().HaveCount(1, "RadicaWeb debe ejecutarse tras los 3 intentos aunque haya incidencia de infraestructura");
+        radicaWeb.Llamadas[0].Combinaciones.Should().NotBeEmpty();
+        File.Exists(txt).Should().BeTrue("el TXT no debe eliminarse en PendienteReintento");
+    }
+
+    [Fact]
+    public async Task LoteSinExitosos_NoInvocaRadicaWeb()
+    {
+        using var escenario = new Worker2Escenario();
+        escenario.CrearPdfEnProcesar("doc1.pdf");
+        var txt = escenario.CrearTxtLote();
+
+        var radicaWeb = new NoopRadicaWebIntegracionService();
+        var documento = Substitute.For<IDocumentoProcesamientoService>();
+        documento.ProcesarAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(FalloApi());
+
+        var openAi = Substitute.For<IOpenAiBarcodeService>();
+        openAi.LeerCodigoAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new OpenAiBarcodeResult { Tipo = OpenAiBarcodeResultKind.NoBarcode });
+
+        var servicio = escenario.CrearServicio(documento, openAi, radicaWeb: radicaWeb);
+
+        await servicio.ProcesarLoteAsync(txt, CancellationToken.None);
+
+        radicaWeb.Llamadas.Should().BeEmpty();
     }
 
     [Fact]

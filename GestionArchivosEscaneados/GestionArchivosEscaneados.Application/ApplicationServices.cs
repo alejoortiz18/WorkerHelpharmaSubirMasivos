@@ -458,6 +458,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ReprocesoAppService>();
         services.AddSingleton<TransaccionesAppService>();
         services.AddSingleton<InformesAppService>();
+        services.AddSingleton<RadicaWebAppService>();
         return services;
     }
 }

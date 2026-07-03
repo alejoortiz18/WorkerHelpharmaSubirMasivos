@@ -1,0 +1,50 @@
+@using GestionArchivosEscaneados.Constants
+@model IReadOnlyList<GestionArchivosEscaneados.Models.Entities.RadicaWebBodegaKpi>
+
+<section class="informes-panel shadow-sm">
+    <div class="informes-panel-head">
+        <h2 class="informes-panel-title">@EtiquetasUi.PorBodega</h2>
+        <span class="informes-panel-count">@Model.Count @EtiquetasUi.Registros</span>
+    </div>
+    @if (Model.Count == 0)
+    {
+        <div class="informes-empty">
+            <div class="informes-empty-title">@EtiquetasUi.SinDatosInforme</div>
+        </div>
+    }
+    else
+    {
+        var max = Math.Max(1, Model.Max(b => b.Total));
+        <div class="informes-table-wrap">
+            <table class="informes-table">
+                <thead>
+                    <tr>
+                        <th>@EtiquetasUi.Bodega</th>
+                        <th>@EtiquetasUi.TotalNotificaciones</th>
+                        <th>@EtiquetasUi.NotificacionesExitosas</th>
+                        <th>@EtiquetasUi.NotificacionesFallidas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        var pct = (int)Math.Round(item.Total * 100.0 / max);
+                        <tr>
+                            <td><span class="badge text-bg-light border">@item.Bodega</span></td>
+                            <td class="informes-bar-cell">
+                                <div class="informes-bar-track">
+                                    <div class="informes-bar-bg">
+                                        <div class="informes-bar-fill" style="width: @(pct)%"></div>
+                                    </div>
+                                    <span class="informes-bar-value">@item.Total.ToString("N0")</span>
+                                </div>
+                            </td>
+                            <td class="text-success fw-semibold">@item.Exitosas</td>
+                            <td class="text-danger fw-semibold">@item.Fallidas</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

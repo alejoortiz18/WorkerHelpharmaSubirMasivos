@@ -149,15 +149,29 @@ public static class Worker2IntegracionHelper
             Options.Create(Config.GetSection("Red").Get<RedSettings>() ?? new RedSettings()),
             NullLogger<RedDisponibleService>.Instance);
 
+        var radicaWeb = CrearRadicaWebIntegracion(trazabilidad);
+
         return new LoteProcesamientoService(
             fileManager,
             documento,
             openAi,
             email,
             trazabilidad,
+            radicaWeb,
             redDisponible,
             fileSettings,
             NullLogger<LoteProcesamientoService>.Instance);
+    }
+
+    private static IRadicaWebIntegracionService CrearRadicaWebIntegracion(ITrazabilidadSqlService trazabilidad)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
+        services.AddSingleton(trazabilidad);
+        services.AddRadicaWebInfrastructure(Config);
+
+        var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<IRadicaWebIntegracionService>();
     }
 
     public static LoteWatcherInfrastructure CrearWatcherReal(LoteProcesamientoService loteProcesamiento)

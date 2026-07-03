@@ -1189,9 +1189,99 @@ html, body {
     margin-inline: auto;
 }
 
+.radicaweb-table .radicaweb-msg {
+    max-width: 14rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.informes-page.radicaweb-page {
+    max-width: none;
+    width: 100%;
+}
+
+.radicaweb-page .informes-filter-body .form-control,
+.radicaweb-page .informes-filter-body .form-select {
+    min-width: 0;
+}
+
+.radicaweb-page .informes-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+}
+
+.radicaweb-page .informes-tabs .nav-link {
+    white-space: nowrap;
+}
+
+.radicaweb-table-wrap {
+    max-height: min(70vh, 720px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.radicaweb-table {
+    min-width: 960px;
+}
+
+.radicaweb-table .radicaweb-col-acciones,
+.radicaweb-table thead th.radicaweb-col-acciones {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: -4px 0 8px rgba(15, 23, 42, .06);
+    white-space: nowrap;
+}
+
+.radicaweb-table thead th.radicaweb-col-acciones {
+    background: #f8fafc;
+    z-index: 3;
+}
+
+.radicaweb-table tbody tr:hover .radicaweb-col-acciones {
+    background: #f8fbff;
+}
+
+.radicaweb-pagination {
+    background: #fff;
+    border-radius: 0 0 .75rem .75rem;
+}
+
+.informes-page.radicaweb-page .informes-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1199px) {
+    .informes-page.radicaweb-page .informes-kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 991px) {
     .informes-kpi-grid {
         grid-template-columns: 1fr;
+    }
+
+    .informes-page.radicaweb-page .informes-kpi-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .radicaweb-pagination {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .radicaweb-pagination nav,
+    .radicaweb-pagination form {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .radicaweb-pagination .pagination {
+        justify-content: center;
     }
 
     .informes-user-hero {
@@ -1220,4 +1310,106 @@ html, body {
         flex-direction: row;
         flex-wrap: wrap;
     }
+}
+
+@media (max-width: 575px) {
+    .informes-page.radicaweb-page .informes-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .radicaweb-table .radicaweb-msg {
+        max-width: 8rem;
+    }
+}
+
+.radicaweb-confirm-modal .modal-dialog {
+    max-width: 440px;
+}
+
+.radicaweb-confirm-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.35rem 1.35rem .75rem;
+    background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
+    color: #fff;
+}
+
+.radicaweb-confirm-modal-icon {
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
+    border-radius: .85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, .15);
+    color: #fff;
+}
+
+.radicaweb-confirm-modal-subtitle {
+    font-size: .875rem;
+    color: rgba(255, 255, 255, .82);
+    line-height: 1.45;
+    max-width: 18rem;
+}
+
+.radicaweb-confirm-summary {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: .85rem;
+    padding: 1rem 1.1rem;
+}
+
+.radicaweb-confirm-summary-label {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+    margin-bottom: .75rem;
+}
+
+.radicaweb-confirm-dl {
+    display: grid;
+    gap: .55rem;
+}
+
+.radicaweb-confirm-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid #e8eef4;
+}
+
+.radicaweb-confirm-row:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.radicaweb-confirm-row dt {
+    font-size: .8rem;
+    color: #64748b;
+    font-weight: 500;
+    margin: 0;
+}
+
+.radicaweb-confirm-row dd {
+    font-size: .9rem;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+    text-align: right;
+    word-break: break-word;
+}
+
+.radicaweb-confirm-modal .modal-footer {
+    padding: 1rem 1.25rem 1.25rem;
+    gap: .5rem;
+}
+
+.radicaweb-confirm-modal .modal-footer .btn-primary {
+    min-width: 9.5rem;
 }

@@ -1,0 +1,188 @@
+@using GestionArchivosEscaneados.Constants
+@model GestionArchivosEscaneados.Application.RadicaWebPanelDatos
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = EtiquetasUi.RadicaWeb;
+    var f = Model.Filtros;
+    var desde = f.Desde?.ToString("yyyy-MM-dd");
+    var hasta = f.Hasta?.ToString("yyyy-MM-dd");
+    var tabNotificaciones = f.Tab == "notificaciones";
+    var tabKpis = f.Tab == "kpis";
+    var hayFiltro = f.Desde.HasValue || f.Hasta.HasValue || !string.IsNullOrWhiteSpace(f.Usuario)
+        || !string.IsNullOrWhiteSpace(f.Bodega) || f.Success.HasValue;
+}
+
+<div class="informes-page radicaweb-page">
+    <div class="page-header mb-4">
+        <h1 class="h3 mb-1">@EtiquetasUi.RadicaWeb</h1>
+        <p class="text-muted mb-0">@EtiquetasUi.RadicaWebDescripcion</p>
+    </div>
+
+    @if (TempData["RadicaWebMensajeOk"] is string ok)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @ok
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    @if (TempData["RadicaWebMensajeError"] is string err)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @err
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="informes-kpi-grid mb-4">
+        <div class="informes-kpi informes-kpi-primary">
+            <div class="informes-kpi-label">@EtiquetasUi.TotalNotificaciones</div>
+            <div class="informes-kpi-value">@Model.KpiResumen.Total.ToString("N0")</div>
+            <div class="informes-kpi-hint">@(hayFiltro ? EtiquetasUi.FiltroActivo : EtiquetasUi.TodoElHistorico)</div>
+        </div>
+        <div class="informes-kpi">
+            <div class="informes-kpi-label">@EtiquetasUi.NotificacionesExitosas</div>
+            <div class="informes-kpi-value text-success">@Model.KpiResumen.Exitosas.ToString("N0")</div>
+        </div>
+        <div class="informes-kpi">
+            <div class="informes-kpi-label">@EtiquetasUi.NotificacionesFallidas</div>
+            <div class="informes-kpi-value text-danger">@Model.KpiResumen.Fallidas.ToString("N0")</div>
+        </div>
+        <div class="informes-kpi">
+            <div class="informes-kpi-label">@EtiquetasUi.BodegasNotificadas</div>
+            <div class="informes-kpi-value">@Model.KpiResumen.BodegasDistintas.ToString("N0")</div>
+            <div class="informes-kpi-hint">@Model.KpiResumen.UsuariosDistintos @EtiquetasUi.UsuariosNotificados.ToLower()</div>
+        </div>
+    </div>
+
+    <div class="informes-filter-card shadow-sm mb-4">
+        <div class="informes-filter-head">
+            <h2 class="informes-filter-title">@EtiquetasUi.FiltrarNotificaciones</h2>
+        </div>
+        <div class="informes-filter-body">
+            <form method="get" asp-action="Index" class="row g-3 align-items-end">
+                <input type="hidden" name="tab" value="@f.Tab" />
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Desde</label>
+                    <input type="date" name="desde" class="form-control" value="@desde" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Hasta</label>
+                    <input type="date" name="hasta" class="form-control" value="@hasta" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Usuario</label>
+                    <select name="usuario" class="form-select">
+                        <option value="">@EtiquetasUi.EstadoTodas</option>
+                        @foreach (var u in Model.UsuariosDisponibles)
+                        {
+                            <option value="@u" selected="@(f.Usuario == u)">@u</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Bodega</label>
+                    <input type="text" name="bodega" class="form-control" value="@f.Bodega" placeholder="DOMICILIOSMED" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                    <label class="form-label small fw-semibold text-muted">@EtiquetasUi.Estado</label>
+                    <select name="estado" class="form-select">
+                        <option value="" selected="@(!f.Success.HasValue)">@EtiquetasUi.EstadoTodas</option>
+                        <option value="exitosas" selected="@(f.Success == true)">@EtiquetasUi.EstadoExitosas</option>
+                        <option value="fallidas" selected="@(f.Success == false)">@EtiquetasUi.EstadoFallidas</option>
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-4 col-xl-2 d-grid">
+                    <button type="submit" class="btn btn-primary">@EtiquetasUi.AplicarFiltro</button>
+                    @if (hayFiltro)
+                    {
+                        <a asp-action="Index" asp-route-tab="@f.Tab" class="btn btn-link btn-sm text-decoration-none px-0 mt-1">@EtiquetasUi.LimpiarFiltros</a>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <ul class="nav informes-tabs" id="radicaWebTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(tabNotificaciones ? "active" : "")" id="tab-notificaciones"
+                    data-bs-toggle="tab" data-bs-target="#pane-notificaciones" type="button" role="tab">
+                @EtiquetasUi.RadicaWebNotificaciones
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(tabKpis ? "active" : "")" id="tab-kpis"
+                    data-bs-toggle="tab" data-bs-target="#pane-kpis" type="button" role="tab">
+                @EtiquetasUi.RadicaWebKpis
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="radicaWebTabContent">
+        <div class="tab-pane fade @(tabNotificaciones ? "show active" : "")" id="pane-notificaciones" role="tabpanel">
+            @await Html.PartialAsync("_TablaNotificaciones", Model)
+        </div>
+        <div class="tab-pane fade @(tabKpis ? "show active" : "")" id="pane-kpis" role="tabpanel">
+            @await Html.PartialAsync("_KpiPane", Model)
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync("_RenotificarModal")
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tabs = document.querySelectorAll('#radicaWebTabs button[data-bs-toggle="tab"]');
+            tabs.forEach(function (btn) {
+                btn.addEventListener('shown.bs.tab', function (e) {
+                    var tabInput = document.querySelector('form input[name="tab"]');
+                    if (!tabInput) return;
+                    tabInput.value = e.target.id === 'tab-kpis' ? 'kpis' : 'notificaciones';
+                });
+            });
+
+            var modalEl = document.getElementById('modalRenotificar');
+            if (!modalEl) return;
+
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            var btnConfirmar = document.getElementById('btnConfirmarRenotificar');
+            var btnText = btnConfirmar.querySelector('.radicaweb-confirm-btn-text');
+            var btnSpinner = btnConfirmar.querySelector('.radicaweb-confirm-btn-spinner');
+            var pendingFormId = null;
+
+            function resetConfirmButton() {
+                btnConfirmar.disabled = false;
+                btnText.classList.remove('d-none');
+                btnSpinner.classList.add('d-none');
+            }
+
+            modalEl.addEventListener('hidden.bs.modal', function () {
+                pendingFormId = null;
+                resetConfirmButton();
+            });
+
+            document.querySelectorAll('.js-radicaweb-renotificar').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    pendingFormId = btn.getAttribute('data-form-id');
+                    document.getElementById('renotificarResumenId').textContent = btn.getAttribute('data-registro-id') || '—';
+                    document.getElementById('renotificarResumenUsuario').textContent = btn.getAttribute('data-usuario') || '—';
+                    document.getElementById('renotificarResumenFecha').textContent = btn.getAttribute('data-fecha') || '—';
+                    document.getElementById('renotificarResumenBodega').textContent = btn.getAttribute('data-bodega') || '—';
+                    resetConfirmButton();
+                    modal.show();
+                });
+            });
+
+            btnConfirmar.addEventListener('click', function () {
+                if (!pendingFormId) return;
+                var form = document.getElementById(pendingFormId);
+                if (!form) return;
+
+                btnConfirmar.disabled = true;
+                btnText.classList.add('d-none');
+                btnSpinner.classList.remove('d-none');
+                form.submit();
+            });
+        });
+    </script>
+}

@@ -39,6 +39,7 @@ builder.Services.Configure<TrazabilidadSqlSettings>(
     builder.Configuration.GetSection("TrazabilidadSql"));
 
 builder.Services.AddSoporteHelpharmaIntegracion(builder.Configuration);
+builder.Services.AddRadicaWebInfrastructure(builder.Configuration);
 
 builder.Services.AddSingleton<IronBarcodeLicenseInitializer>();
 builder.Services.AddSingleton<RedDisponibleService>();

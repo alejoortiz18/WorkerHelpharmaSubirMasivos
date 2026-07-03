@@ -1,0 +1,159 @@
+@using GestionArchivosEscaneados.Constants
+@model GestionArchivosEscaneados.Application.RadicaWebPanelDatos
+@{
+    var f = Model.Filtros;
+    var estado = f.Success switch { true => "exitosas", false => "fallidas", _ => (string?)null };
+    var apiOk = Model.ApiConfigurada;
+}
+
+<section class="informes-panel shadow-sm">
+    <div class="informes-panel-head">
+        <h2 class="informes-panel-title">@EtiquetasUi.RadicaWebNotificaciones</h2>
+        <span class="informes-panel-count">@Model.TotalNotificaciones @EtiquetasUi.Registros</span>
+    </div>
+
+    @if (!apiOk)
+    {
+        <div class="alert alert-warning m-3 mb-0">@EtiquetasUi.ApiNoConfigurada</div>
+    }
+
+    @if (Model.Notificaciones.Count == 0)
+    {
+        <div class="informes-empty">
+            <div class="informes-empty-title">@EtiquetasUi.SinDatosInforme</div>
+        </div>
+    }
+    else
+    {
+        <div class="informes-table-wrap radicaweb-table-wrap">
+            <table class="table table-hover table-sm mb-0 radicaweb-table informes-table">
+                <thead>
+                    <tr>
+                        <th>@EtiquetasUi.IdRegistro</th>
+                        <th>@EtiquetasUi.Usuario</th>
+                        <th>@EtiquetasUi.FechaFactura</th>
+                        <th>@EtiquetasUi.Bodega</th>
+                        <th>@EtiquetasUi.Estado</th>
+                        <th>@EtiquetasUi.StatusCode</th>
+                        <th>@EtiquetasUi.SolicitudId</th>
+                        <th>@EtiquetasUi.MensajeApi</th>
+                        <th>@EtiquetasUi.FechaNotificacion</th>
+                        <th class="radicaweb-col-acciones">@EtiquetasUi.Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var n in Model.Notificaciones)
+                    {
+                        var badgeClass = n.Success == true ? "bg-success" : n.Success == false ? "bg-danger" : "bg-secondary";
+                        var estadoTexto = n.Success == true ? EtiquetasUi.EstadoExitosas : n.Success == false ? EtiquetasUi.EstadoFallidas : EtiquetasUi.SinResultado;
+                        <tr>
+                            <td>@n.RadicaWebApiId</td>
+                            <td>@n.NombreUsuario</td>
+                            <td>@n.FechaFactura.ToString("yyyy-MM-dd")</td>
+                            <td><span class="badge text-bg-light border">@n.Bodega</span></td>
+                            <td><span class="badge @badgeClass">@estadoTexto</span></td>
+                            <td>@(n.StatusCode?.ToString() ?? "—")</td>
+                            <td>@(n.SolicitudId?.ToString() ?? "—")</td>
+                            <td class="radicaweb-msg" title="@n.Message">@(string.IsNullOrEmpty(n.Message) ? "—" : (n.Message.Length > 60 ? n.Message[..60] + "…" : n.Message))</td>
+                            <td>@n.CreadoEn.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="radicaweb-col-acciones">
+                                @if (n.Success == false)
+                                {
+                                    if (apiOk)
+                                    {
+                                        var formId = $"renotificar-form-{n.RadicaWebApiId}";
+                                        <form method="post" asp-action="Renotificar" id="@formId" class="d-inline radicaweb-renotificar-form">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@n.RadicaWebApiId" />
+                                            <input type="hidden" name="desde" value="@f.Desde?.ToString("yyyy-MM-dd")" />
+                                            <input type="hidden" name="hasta" value="@f.Hasta?.ToString("yyyy-MM-dd")" />
+                                            <input type="hidden" name="usuario" value="@f.Usuario" />
+                                            <input type="hidden" name="bodega" value="@f.Bodega" />
+                                            <input type="hidden" name="estado" value="@estado" />
+                                            <input type="hidden" name="pagina" value="@Model.Pagina" />
+                                            <input type="hidden" name="tamanoPagina" value="@Model.TamanoPagina" />
+                                            <input type="hidden" name="tab" value="notificaciones" />
+                                        </form>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary text-nowrap js-radicaweb-renotificar"
+                                                data-form-id="@formId"
+                                                data-registro-id="@n.RadicaWebApiId"
+                                                data-usuario="@n.NombreUsuario"
+                                                data-fecha="@n.FechaFactura.ToString("yyyy-MM-dd")"
+                                                data-bodega="@n.Bodega">
+                                            @EtiquetasUi.Renotificar
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" disabled
+                                                title="@EtiquetasUi.ApiNoConfigurada">@EtiquetasUi.Renotificar</button>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="radicaweb-pagination d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 border-top">
+            <div class="text-muted small">
+                @EtiquetasUi.Mostrando
+                @{
+                    var inicio = Model.TotalNotificaciones == 0 ? 0 : (Model.Pagina - 1) * Model.TamanoPagina + 1;
+                    var fin = Math.Min(Model.Pagina * Model.TamanoPagina, Model.TotalNotificaciones);
+                }
+                @inicio–@fin @EtiquetasUi.De @Model.TotalNotificaciones
+            </div>
+            <nav aria-label="Paginación">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.Pagina <= 1 ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index"
+                           asp-route-desde="@f.Desde?.ToString("yyyy-MM-dd")"
+                           asp-route-hasta="@f.Hasta?.ToString("yyyy-MM-dd")"
+                           asp-route-usuario="@f.Usuario"
+                           asp-route-bodega="@f.Bodega"
+                           asp-route-estado="@estado"
+                           asp-route-pagina="@(Model.Pagina - 1)"
+                           asp-route-tamanoPagina="@Model.TamanoPagina"
+                           asp-route-tab="notificaciones">@EtiquetasUi.Anterior</a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">@EtiquetasUi.Pagina @Model.Pagina @EtiquetasUi.De @Model.TotalPaginas</span>
+                    </li>
+                    <li class="page-item @(Model.Pagina >= Model.TotalPaginas ? "disabled" : "")">
+                        <a class="page-link" asp-action="Index"
+                           asp-route-desde="@f.Desde?.ToString("yyyy-MM-dd")"
+                           asp-route-hasta="@f.Hasta?.ToString("yyyy-MM-dd")"
+                           asp-route-usuario="@f.Usuario"
+                           asp-route-bodega="@f.Bodega"
+                           asp-route-estado="@estado"
+                           asp-route-pagina="@(Model.Pagina + 1)"
+                           asp-route-tamanoPagina="@Model.TamanoPagina"
+                           asp-route-tab="notificaciones">@EtiquetasUi.Siguiente</a>
+                    </li>
+                </ul>
+            </nav>
+            <form method="get" asp-action="Index" class="d-flex align-items-center gap-2">
+                <input type="hidden" name="desde" value="@f.Desde?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="hasta" value="@f.Hasta?.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="usuario" value="@f.Usuario" />
+                <input type="hidden" name="bodega" value="@f.Bodega" />
+                <input type="hidden" name="estado" value="@estado" />
+                <input type="hidden" name="tab" value="notificaciones" />
+                <label class="small text-muted mb-0">@EtiquetasUi.FilasPorPagina</label>
+                <select name="tamanoPagina" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                    @foreach (var size in new[] { 10, 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(Model.TamanoPagina == size)">@size</option>
+                    }
+                </select>
+            </form>
+        </div>
+    }
+</section>

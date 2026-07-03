@@ -40,7 +40,8 @@ public class SaludAppService
             await ConstruirAsync(ProductoIntegracion.Unc, cancellationToken),
             await ConstruirAsync(ProductoIntegracion.SoporteApi, cancellationToken),
             await ConstruirAsync(ProductoIntegracion.SoporteFisico, cancellationToken),
-            await ConstruirAsync(ProductoIntegracion.OpenAi, cancellationToken)
+            await ConstruirAsync(ProductoIntegracion.OpenAi, cancellationToken),
+            await ConstruirAsync(ProductoIntegracion.RadicaWeb, cancellationToken)
         };
 
         return new SaludPanel { Integraciones = integraciones };
@@ -159,6 +160,15 @@ public class SaludAppService
                     cancellationToken,
                     bearer: true);
                 break;
+
+            case var p when p == ProductoIntegracion.RadicaWeb:
+                await VerificarHttpPostRadicaWebAsync(
+                    item,
+                    registro?.Endpoint ?? await _config.ObtenerRadicaWebApiUrlAsync(cancellationToken),
+                    registro?.ClaveCredencial ?? await _config.ObtenerRadicaWebApiClientAsync(cancellationToken),
+                    registro?.ValorAdicional ?? await _config.ObtenerRadicaWebApiSecretAsync(cancellationToken),
+                    cancellationToken);
+                break;
         }
     }
 
@@ -169,6 +179,7 @@ public class SaludAppService
             ProductoIntegracion.SoporteApi => !secundario,
             ProductoIntegracion.SoporteFisico => !secundario,
             ProductoIntegracion.OpenAi => !secundario,
+            ProductoIntegracion.RadicaWeb => true,
             _ => false
         };
 
@@ -196,6 +207,60 @@ public class SaludAppService
         else
         {
             item.ValorAdicionalEnmascarado = item.ValorAdicional ?? string.Empty;
+        }
+    }
+
+    private async Task VerificarHttpPostRadicaWebAsync(
+        IntegracionSaludItem item,
+        string endpoint,
+        string apiClient,
+        string apiSecret,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            item.Activo = false;
+            item.Error = "Endpoint no configurado.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(apiClient) || string.IsNullOrWhiteSpace(apiSecret))
+        {
+            item.Activo = false;
+            item.Error = "Credenciales x-api-client / x-api-secret no configuradas.";
+            return;
+        }
+
+        try
+        {
+            using var client = _httpClientFactory.CreateClient(nameof(SaludAppService));
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            request.Headers.TryAddWithoutValidation("x-api-client", apiClient);
+            request.Headers.TryAddWithoutValidation("x-api-secret", apiSecret);
+            request.Content = new StringContent(
+                "{\"fecha\":\"2000-01-01\",\"bodega\":\"SALUD_CHECK\"}",
+                Encoding.UTF8,
+                "application/json");
+
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                item.Activo = false;
+                item.Error = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
+                return;
+            }
+
+            item.Activo = true;
+            if (!response.IsSuccessStatusCode)
+                item.Error = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase} (conexión disponible)";
+        }
+        catch (Exception ex)
+        {
+            item.Activo = false;
+            item.Error = ex.Message;
+            _logger.LogWarning(ex, "SaludVerificacionFallo | Producto={Producto}", item.Producto);
         }
     }
 

@@ -51,8 +51,9 @@ $config = Get-Content (Join-Path $Destino "appsettings.json") -Raw | ConvertFrom
 Merge-Seccion $config $configAnterior "Red"
 Merge-Seccion $config $configAnterior "Email"
 Merge-Seccion $config $configAnterior "OpenAi"
-Merge-Seccion $config $configAnterior "IronBarcode"
-Merge-Seccion $config $configAnterior "ApiCredentials"
+        Merge-Seccion $config $configAnterior "IronBarcode"
+        Merge-Seccion $config $configAnterior "ApiCredentials"
+        Merge-Seccion $config $configAnterior "RadicaWeb"
 
 if (Test-Path $CredencialesLocales) {
     $local = Get-Content $CredencialesLocales -Raw | ConvertFrom-Json
@@ -61,6 +62,7 @@ if (Test-Path $CredencialesLocales) {
     Merge-Seccion $config $local "OpenAi"
     Merge-Seccion $config $local "IronBarcode"
     Merge-Seccion $config $local "ApiCredentials"
+    Merge-Seccion $config $local "RadicaWeb"
     Copy-Item $CredencialesLocales (Join-Path $Destino "appsettings.Production.local.json") -Force
 }
 

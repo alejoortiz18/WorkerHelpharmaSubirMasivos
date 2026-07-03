@@ -20,6 +20,17 @@ public interface ITrazabilidadSqlService
         DateTime? fechaFactura,
         bool procesado,
         CancellationToken cancellationToken = default);
+
+    Task RegistrarRadicaWebAsync(
+        RutasLoteContext contexto,
+        DateOnly fechaFactura,
+        string bodega,
+        RadicaWebBusquedaResultado resultado,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<(DateOnly Fecha, string Bodega)>> ObtenerCombinacionesRadicaWebAsync(
+        RutasLoteContext contexto,
+        CancellationToken cancellationToken = default);
 }
 
 public class TrazabilidadSqlService : ITrazabilidadSqlService
@@ -262,6 +273,32 @@ BEGIN
         COMMIT TRAN;
     END');
 END
+
+IF OBJECT_ID(N'dbo.RadicaWebAPI', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.RadicaWebAPI
+    (
+        RadicaWebApiId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_RadicaWebAPI PRIMARY KEY,
+        UsuarioId int NOT NULL,
+        FechaFactura date NOT NULL,
+        Bodega nvarchar(100) NOT NULL,
+        Success bit NULL,
+        Message nvarchar(max) NULL,
+        SolicitudId int NULL,
+        RegistrosInsertados int NULL,
+        TotalRegistros int NULL,
+        JobId nvarchar(200) NULL,
+        StatusCode int NULL,
+        Error nvarchar(200) NULL,
+        Timestamp datetimeoffset(0) NULL,
+        Path nvarchar(500) NULL,
+        CreadoEn datetime2(0) NOT NULL CONSTRAINT DF_RadicaWebAPI_CreadoEn DEFAULT (sysdatetime()),
+        CONSTRAINT FK_RadicaWebAPI_Usuarios FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuarios(UsuarioId)
+    );
+
+    CREATE INDEX IX_RadicaWebAPI_UsuarioId_CreadoEn
+        ON dbo.RadicaWebAPI (UsuarioId, CreadoEn DESC);
+END
 """;
 
         await EjecutarSqlAsync(script, cancellationToken, databaseName: "master");
@@ -398,6 +435,179 @@ COMMIT TRAN;
                 contexto.Fecha,
                 nombreArchivo);
         }
+    }
+
+    public async Task RegistrarRadicaWebAsync(
+        RutasLoteContext contexto,
+        DateOnly fechaFactura,
+        string bodega,
+        RadicaWebBusquedaResultado resultado,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+BEGIN TRAN;
+
+DECLARE @UsuarioId int;
+
+SELECT @UsuarioId = UsuarioId
+FROM dbo.Usuarios WITH (UPDLOCK, HOLDLOCK)
+WHERE NombreUsuario = @NombreUsuario;
+
+IF @UsuarioId IS NULL
+BEGIN
+    INSERT INTO dbo.Usuarios (NombreUsuario)
+    VALUES (@NombreUsuario);
+
+    SET @UsuarioId = SCOPE_IDENTITY();
+END
+
+INSERT INTO dbo.RadicaWebAPI
+(
+    UsuarioId,
+    FechaFactura,
+    Bodega,
+    Success,
+    Message,
+    SolicitudId,
+    RegistrosInsertados,
+    TotalRegistros,
+    JobId,
+    StatusCode,
+    Error,
+    Timestamp,
+    Path
+)
+VALUES
+(
+    @UsuarioId,
+    @FechaFactura,
+    @Bodega,
+    @Success,
+    @Message,
+    @SolicitudId,
+    @RegistrosInsertados,
+    @TotalRegistros,
+    @JobId,
+    @StatusCode,
+    @Error,
+    @Timestamp,
+    @Path
+);
+
+COMMIT TRAN;
+""";
+
+        try
+        {
+            await EjecutarSqlAsync(sql, cancellationToken, command =>
+            {
+                command.Parameters.Add("@NombreUsuario", System.Data.SqlDbType.NVarChar, 100).Value = contexto.Usuario;
+                command.Parameters.Add("@FechaFactura", System.Data.SqlDbType.Date).Value =
+                    fechaFactura.ToDateTime(TimeOnly.MinValue);
+                command.Parameters.Add("@Bodega", System.Data.SqlDbType.NVarChar, 100).Value = bodega;
+                command.Parameters.Add("@Success", System.Data.SqlDbType.Bit).Value =
+                    (object?)resultado.Success ?? DBNull.Value;
+                command.Parameters.Add("@Message", System.Data.SqlDbType.NVarChar, -1).Value =
+                    (object?)resultado.Message ?? DBNull.Value;
+                command.Parameters.Add("@SolicitudId", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.SolicitudId ?? DBNull.Value;
+                command.Parameters.Add("@RegistrosInsertados", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.RegistrosInsertados ?? DBNull.Value;
+                command.Parameters.Add("@TotalRegistros", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.TotalRegistros ?? DBNull.Value;
+                command.Parameters.Add("@JobId", System.Data.SqlDbType.NVarChar, 200).Value =
+                    (object?)resultado.JobId ?? DBNull.Value;
+                command.Parameters.Add("@StatusCode", System.Data.SqlDbType.Int).Value =
+                    (object?)resultado.HttpStatusCode ?? DBNull.Value;
+                command.Parameters.Add("@Error", System.Data.SqlDbType.NVarChar, 200).Value =
+                    (object?)resultado.Error ?? DBNull.Value;
+                command.Parameters.Add("@Timestamp", System.Data.SqlDbType.DateTimeOffset).Value =
+                    (object?)resultado.Timestamp ?? DBNull.Value;
+                command.Parameters.Add("@Path", System.Data.SqlDbType.NVarChar, 500).Value =
+                    (object?)resultado.Path ?? DBNull.Value;
+            });
+
+            _logger.LogInformation(
+                "RadicaWebTrazabilidadRegistrada | Usuario={Usuario} | FechaFactura={FechaFactura} | Bodega={Bodega} | Success={Success} | StatusCode={StatusCode}",
+                contexto.Usuario,
+                fechaFactura,
+                bodega,
+                resultado.Success?.ToString() ?? "(null)",
+                resultado.HttpStatusCode?.ToString() ?? "(null)");
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "RadicaWebTrazabilidadSqlError | Usuario={Usuario} | FechaFactura={FechaFactura} | Bodega={Bodega}",
+                contexto.Usuario,
+                fechaFactura,
+                bodega);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<(DateOnly Fecha, string Bodega)>> ObtenerCombinacionesRadicaWebAsync(
+        RutasLoteContext contexto,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+SELECT DISTINCT
+    CAST(dp.FechaFactura AS date) AS FechaFactura,
+    LTRIM(RTRIM(dp.IdBodega)) AS IdBodega
+FROM dbo.DocumentosProcesados dp
+INNER JOIN dbo.FechasProcesamiento fp ON fp.FechaProcesamientoId = dp.FechaProcesamientoId
+INNER JOIN dbo.Usuarios u ON u.UsuarioId = fp.UsuarioId
+WHERE u.NombreUsuario = @NombreUsuario
+  AND fp.FechaProcesamiento = @FechaProcesamiento
+  AND dp.Procesado = 1
+  AND dp.FechaFactura IS NOT NULL
+  AND dp.IdBodega IS NOT NULL
+  AND LTRIM(RTRIM(dp.IdBodega)) <> N'';
+""";
+
+        var fechaProcesamiento = DateOnly.ParseExact(contexto.Fecha, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var combinaciones = new List<(DateOnly Fecha, string Bodega)>();
+        var connectionString = new SqlConnectionStringBuilder(_connectionString) { InitialCatalog = "Scaneados" }.ConnectionString;
+
+        try
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("@NombreUsuario", contexto.Usuario);
+            command.Parameters.Add("@FechaProcesamiento", System.Data.SqlDbType.Date).Value =
+                fechaProcesamiento.ToDateTime(TimeOnly.MinValue);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var fecha = DateOnly.FromDateTime(reader.GetDateTime(0));
+                var bodega = reader.GetString(1);
+                combinaciones.Add((fecha, bodega));
+            }
+
+            _logger.LogInformation(
+                "RadicaWebCombinacionesObtenidas | Usuario={Usuario} | Fecha={Fecha} | Combinaciones={Combinaciones}",
+                contexto.Usuario,
+                contexto.Fecha,
+                combinaciones.Count);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "RadicaWebCombinacionesSqlError | Usuario={Usuario} | Fecha={Fecha}",
+                contexto.Usuario,
+                contexto.Fecha);
+        }
+
+        return combinaciones;
     }
 
     public async Task EjecutarSqlAsync(

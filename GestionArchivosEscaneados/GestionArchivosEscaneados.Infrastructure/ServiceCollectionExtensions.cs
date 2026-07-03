@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<SoporteApiService>();
         services.AddHttpClient<SoporteFisicoApiService>();
         services.AddHttpClient<OpenAiBarcodeService>();
+        services.AddHttpClient<RadicaWebApiService>();
 
         services.AddHttpClient(nameof(SaludAppService));
 

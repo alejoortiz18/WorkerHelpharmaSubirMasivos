@@ -55,6 +55,7 @@ public class ConfiguracionBdFuncionalTests
         filas.Should().ContainKey(ProductoIntegracion.SoporteApi);
         filas.Should().ContainKey(ProductoIntegracion.SoporteFisico);
         filas.Should().ContainKey(ProductoIntegracion.OpenAi);
+        filas.Should().ContainKey(ProductoIntegracion.RadicaWeb);
 
         (await config.ObtenerRaizUncAsync()).Should().Be(filas[ProductoIntegracion.Unc].Endpoint!.Trim());
         (await config.ObtenerRedUsuarioAsync()).Should().Be(filas[ProductoIntegracion.Unc].ClaveCredencial!.Trim());
@@ -71,6 +72,10 @@ public class ConfiguracionBdFuncionalTests
         (await config.ObtenerOpenAiModelsUrlAsync()).Should().Be(filas[ProductoIntegracion.OpenAi].EndpointVerificacion!.Trim());
         (await config.ObtenerOpenAiApiKeyAsync()).Should().Be(filas[ProductoIntegracion.OpenAi].ClaveCredencial!.Trim());
         (await config.ObtenerOpenAiModelAsync()).Should().Be(filas[ProductoIntegracion.OpenAi].ValorAdicional!.Trim());
+
+        (await config.ObtenerRadicaWebApiUrlAsync()).Should().Be(filas[ProductoIntegracion.RadicaWeb].Endpoint!.Trim());
+        (await config.ObtenerRadicaWebApiClientAsync()).Should().Be(filas[ProductoIntegracion.RadicaWeb].ClaveCredencial!.Trim());
+        (await config.ObtenerRadicaWebApiSecretAsync()).Should().Be(filas[ProductoIntegracion.RadicaWeb].ValorAdicional!.Trim());
 
         var promptBd = filas[ProductoIntegracion.OpenAi].Prompt;
         if (!string.IsNullOrWhiteSpace(promptBd))

@@ -419,6 +419,7 @@ FodyWeavers.xsd
 GestionArchivosEscaneados/tmp-portal-home.png
 GestionArchivosEscaneados/tmp-visual-no-procesados-2.png
 GestionArchivosEscaneados/publish-staging/
+_staging/
 
 # Local configuration overrides (contain secrets: API keys, credentials)
 appsettings.local.json

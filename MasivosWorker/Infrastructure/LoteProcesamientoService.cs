@@ -16,6 +16,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
     private readonly IOpenAiBarcodeService _openAiBarcode;
     private readonly IEmailNotificationService _emailNotification;
     private readonly ITrazabilidadSqlService _trazabilidadSql;
+    private readonly IRadicaWebIntegracionService _radicaWebIntegracion;
     private readonly RedDisponibleService _redDisponible;
     private readonly ILogger<LoteProcesamientoService> _logger;
     private readonly int _tamanoLote;
@@ -28,6 +29,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         IOpenAiBarcodeService openAiBarcode,
         IEmailNotificationService emailNotification,
         ITrazabilidadSqlService trazabilidadSql,
+        IRadicaWebIntegracionService radicaWebIntegracion,
         RedDisponibleService redDisponible,
         IOptions<FileSettings> fileSettings,
         ILogger<LoteProcesamientoService> logger)
@@ -37,6 +39,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         _openAiBarcode = openAiBarcode;
         _emailNotification = emailNotification;
         _trazabilidadSql = trazabilidadSql;
+        _radicaWebIntegracion = radicaWebIntegracion;
         _redDisponible = redDisponible;
         _logger = logger;
         _tamanoLote = Math.Max(1, fileSettings.Value.TamanoLote);
@@ -110,6 +113,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         string? errorOpenAiLote = null;
         var archivosAfectadosOpenAi = 0;
         var huboIncidenciaInfraestructura = false;
+        var combinacionesRadicaWeb = new RadicaWebCombinacionAcumulador();
 
         // Intento 1: vaciar procesar por tandas
         while (true)
@@ -121,7 +125,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
             _logger.LogInformation("TandaIniciada | Cantidad={Cantidad}", tanda.Count);
 
             var resultadosTanda = await Task.WhenAll(tanda.Select(pdf =>
-                ProcesarIntento1Async(pdf, contexto, cancellationToken)));
+                ProcesarIntento1Async(pdf, contexto, combinacionesRadicaWeb, cancellationToken)));
 
             foreach (var resultado in resultadosTanda)
             {
@@ -134,7 +138,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         // Intento 2: reprocesar error
         var archivosError = ListarPdfs(contexto.Error);
         var resultadosIntento2 = await Task.WhenAll(archivosError.Select(pdf =>
-            ProcesarIntento2Async(pdf, contexto, cancellationToken)));
+            ProcesarIntento2Async(pdf, contexto, combinacionesRadicaWeb, cancellationToken)));
 
         foreach (var resultado in resultadosIntento2)
         {
@@ -146,7 +150,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         // Intento 3: OpenAI sobre procesaria
         var archivosProcesaria = ListarPdfs(contexto.Procesaria);
         var resultadosIntento3 = await Task.WhenAll(archivosProcesaria.Select(pdf =>
-            ProcesarIntento3OpenAiAsync(pdf, contexto, cancellationToken)));
+            ProcesarIntento3OpenAiAsync(pdf, contexto, combinacionesRadicaWeb, cancellationToken)));
 
         foreach (var resultado in resultadosIntento3)
         {
@@ -178,6 +182,12 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                 cancellationToken);
         }
 
+        await InvocarRadicaWebAlCierreLoteAsync(
+            contexto,
+            combinacionesRadicaWeb,
+            nombreTxt,
+            cancellationToken);
+
         if (huboIncidenciaInfraestructura)
         {
             _logger.LogWarning(
@@ -207,6 +217,36 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         return LoteProcesamientoOutcome.Completado(procesadosLote, noProcesadosLote);
     }
 
+    private async Task InvocarRadicaWebAlCierreLoteAsync(
+        RutasLoteContext contexto,
+        RadicaWebCombinacionAcumulador combinacionesMemoria,
+        string nombreTxt,
+        CancellationToken cancellationToken)
+    {
+        var combinacionesSql = await _trazabilidadSql.ObtenerCombinacionesRadicaWebAsync(contexto, cancellationToken);
+        var combinaciones = combinacionesSql.Count > 0
+            ? combinacionesSql
+            : combinacionesMemoria.ObtenerCombinaciones();
+
+        if (combinaciones.Count == 0)
+            return;
+
+        try
+        {
+            await _radicaWebIntegracion.ProcesarCombinacionesLoteAsync(
+                contexto,
+                combinaciones,
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "RadicaWebLoteError | Txt={Txt} | El lote continuara con el cierre normal",
+                nombreTxt);
+        }
+    }
+
     public static async Task<string> LeerRutaProcesarDesdeTxtAsync(
         string rutaTxt,
         CancellationToken cancellationToken = default)
@@ -229,6 +269,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
     private async Task<IntentoDocumentoResultado> ProcesarIntento1Async(
         string rutaPdf,
         RutasLoteContext contexto,
+        RadicaWebCombinacionAcumulador combinacionesRadicaWeb,
         CancellationToken cancellationToken)
     {
         var nombre = Path.GetFileName(rutaPdf);
@@ -243,7 +284,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         {
             var rutaProcesando = _fileManager.MoverAProcesando(rutaPdf, contexto);
             var resultado = await _documentoProcesamiento.ProcesarAsync(rutaProcesando, cancellationToken);
-            await RegistrarTrazabilidadAsync(contexto, rutaProcesando, resultado, cancellationToken);
+            await RegistrarTrazabilidadAsync(contexto, rutaProcesando, resultado, combinacionesRadicaWeb, cancellationToken);
 
             return AplicarResultadoIntento1(resultado, rutaProcesando, contexto);
         }
@@ -311,6 +352,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
     private async Task<IntentoDocumentoResultado> ProcesarIntento2Async(
         string rutaPdf,
         RutasLoteContext contexto,
+        RadicaWebCombinacionAcumulador combinacionesRadicaWeb,
         CancellationToken cancellationToken)
     {
         var nombre = Path.GetFileName(rutaPdf);
@@ -324,7 +366,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         try
         {
             var resultado = await _documentoProcesamiento.ProcesarAsync(rutaPdf, cancellationToken);
-            await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, cancellationToken);
+            await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, combinacionesRadicaWeb, cancellationToken);
 
             switch (resultado.Estado)
             {
@@ -372,6 +414,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
     private async Task<Intento3Resultado> ProcesarIntento3OpenAiAsync(
         string rutaPdf,
         RutasLoteContext contexto,
+        RadicaWebCombinacionAcumulador combinacionesRadicaWeb,
         CancellationToken cancellationToken)
     {
         var nombre = Path.GetFileName(rutaPdf);
@@ -402,12 +445,12 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                             rutaPdf,
                             resultado.Documento!.NombreArchivo,
                             contexto);
-                        await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, cancellationToken);
+                        await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, combinacionesRadicaWeb, cancellationToken);
                         return Intento3Resultado.Exito();
                     }
 
                     _fileManager.MoverANoprocesados(rutaPdf, contexto);
-                    await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, cancellationToken);
+                    await RegistrarTrazabilidadAsync(contexto, rutaPdf, resultado, combinacionesRadicaWeb, cancellationToken);
                     return Intento3Resultado.NoProcesado();
                 }
 
@@ -416,7 +459,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                     await RegistrarTrazabilidadAsync(contexto, rutaPdf, new DocumentoProcesamientoResult
                     {
                         Estado = DocumentoProcesamientoEstado.FalloBarcode
-                    }, cancellationToken);
+                    }, combinacionesRadicaWeb, cancellationToken);
                     return Intento3Resultado.NoProcesado();
 
                 case OpenAiBarcodeResultKind.ErrorServicio:
@@ -425,7 +468,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
                     await RegistrarTrazabilidadAsync(contexto, rutaPdf, new DocumentoProcesamientoResult
                     {
                         Estado = DocumentoProcesamientoEstado.ErrorInesperado
-                    }, cancellationToken);
+                    }, combinacionesRadicaWeb, cancellationToken);
                     return Intento3Resultado.ErrorOpenAi(openAi.ErrorMensaje ?? "Error OpenAI");
             }
         }
@@ -469,6 +512,7 @@ public class LoteProcesamientoService : ILoteProcesamientoService
         RutasLoteContext contexto,
         string rutaPdf,
         DocumentoProcesamientoResult resultado,
+        RadicaWebCombinacionAcumulador combinacionesRadicaWeb,
         CancellationToken cancellationToken)
     {
         var nombreArchivo = Path.GetFileName(rutaPdf);
@@ -484,6 +528,8 @@ public class LoteProcesamientoService : ILoteProcesamientoService
             resultado.FechaFactura,
             procesado,
             cancellationToken);
+
+        combinacionesRadicaWeb.AgregarSiExitoso(resultado);
     }
 
     private IntentoDocumentoResultado ManejarFalloInfraestructura(

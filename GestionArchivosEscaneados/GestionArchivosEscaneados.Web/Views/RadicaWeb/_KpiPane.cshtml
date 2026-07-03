@@ -1,0 +1,14 @@
+@using GestionArchivosEscaneados.Constants
+@model GestionArchivosEscaneados.Application.RadicaWebPanelDatos
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        @await Html.PartialAsync("_KpiTablaUsuario", Model.PorUsuario)
+    </div>
+    <div class="col-lg-6">
+        @await Html.PartialAsync("_KpiTablaBodega", Model.PorBodega)
+    </div>
+    <div class="col-12">
+        @await Html.PartialAsync("_KpiTablaFechaFactura", Model.PorFechaFactura)
+    </div>
+</div>

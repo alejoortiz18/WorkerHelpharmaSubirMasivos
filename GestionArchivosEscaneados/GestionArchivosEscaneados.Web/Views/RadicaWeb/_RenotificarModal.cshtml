@@ -1,0 +1,53 @@
+@using GestionArchivosEscaneados.Constants
+
+<div class="modal fade radicaweb-confirm-modal" id="modalRenotificar" tabindex="-1"
+     aria-labelledby="modalRenotificarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header radicaweb-confirm-modal-header border-0">
+                <div class="radicaweb-confirm-modal-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                    </svg>
+                </div>
+                <div>
+                    <h5 class="modal-title mb-1" id="modalRenotificarLabel">@EtiquetasUi.RenotificarModalTitulo</h5>
+                    <p class="radicaweb-confirm-modal-subtitle mb-0">@EtiquetasUi.RenotificarModalDescripcion</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"
+                        aria-label="@EtiquetasUi.Cancelar"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <div class="radicaweb-confirm-summary">
+                    <div class="radicaweb-confirm-summary-label">@EtiquetasUi.RenotificarModalResumen</div>
+                    <dl class="radicaweb-confirm-dl mb-0">
+                        <div class="radicaweb-confirm-row">
+                            <dt>@EtiquetasUi.IdRegistro</dt>
+                            <dd id="renotificarResumenId">—</dd>
+                        </div>
+                        <div class="radicaweb-confirm-row">
+                            <dt>@EtiquetasUi.Usuario</dt>
+                            <dd id="renotificarResumenUsuario">—</dd>
+                        </div>
+                        <div class="radicaweb-confirm-row">
+                            <dt>@EtiquetasUi.FechaFactura</dt>
+                            <dd id="renotificarResumenFecha">—</dd>
+                        </div>
+                        <div class="radicaweb-confirm-row">
+                            <dt>@EtiquetasUi.Bodega</dt>
+                            <dd id="renotificarResumenBodega">—</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">@EtiquetasUi.Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmarRenotificar">
+                    <span class="radicaweb-confirm-btn-text">@EtiquetasUi.ConfirmarRenotificar</span>
+                    <span class="radicaweb-confirm-btn-spinner spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -95,6 +95,15 @@ public class ConfiguracionProductoService : IConfiguracionProductoService
             ValorAdicional = Config("OpenAi:Model"),
             Descripcion = "Lectura de códigos de barras con OpenAI"
         };
+
+        yield return new ConfiguracionProducto
+        {
+            Producto = ProductoIntegracion.RadicaWeb,
+            Endpoint = Config("RadicaWeb:ApiUrl") ?? IntegracionDefaults.RadicaWebApiUrl,
+            ClaveCredencial = Config("RadicaWeb:ApiClient"),
+            ValorAdicional = Config("RadicaWeb:ApiSecret"),
+            Descripcion = "Notificación de soportes físicos al API RadicaWeb"
+        };
     }
 
     private string? Config(string clave)
